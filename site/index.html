@@ -68,55 +68,63 @@
         </div>
       </div>
 
-      <div class="app-stage reveal reveal-delay" role="group" aria-label="Application preview">
+      <div class="app-stage reveal reveal-delay" role="group" aria-label="Faithful preview of the current desktop GUI">
         <div class="orbit orbit-one" aria-hidden="true"></div>
         <div class="orbit orbit-two" aria-hidden="true"></div>
-        <div class="app-window">
-          <div class="window-bar">
+        <div class="fyne-window">
+          <div class="fyne-titlebar">
             <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
             <div class="window-title">go-socks2vpn</div>
-            <div class="window-version">latest</div>
           </div>
-          <div class="window-content">
-            <div class="preview-heading">
-              <div>
-                <span class="preview-kicker" data-i18n="preview.kicker">SOCKS → SYSTEM VPN</span>
-                <h2 data-i18n="preview.title">Connection</h2>
+          <div class="fyne-content">
+            <h2>SOCKS4/SOCKS5 → system VPN</h2>
+            <div class="fyne-form">
+              <div class="fyne-field">
+                <span>Protocol</span>
+                <div class="fyne-input fyne-select">SOCKS5 <i>▾</i></div>
               </div>
-              <div class="connected-badge"><span></span><span data-i18n="preview.connected">Connected</span></div>
-            </div>
-            <div class="preview-fields">
-              <div class="preview-field preview-field-small"><span data-i18n="preview.protocol">Protocol</span><strong>SOCKS5</strong></div>
-              <div class="preview-field"><span data-i18n="preview.server">Server</span><strong>proxy.example.net</strong></div>
-              <div class="preview-field preview-field-port"><span data-i18n="preview.port">Port</span><strong>1080</strong></div>
-            </div>
-            <div class="preview-button-row">
-              <div class="preview-button active" data-i18n="preview.disconnect">Disconnect</div>
-              <div class="session-time"><span data-i18n="preview.session">Session</span> <strong>01:42:18</strong></div>
-            </div>
-            <div class="stats-card">
-              <div class="stats-top">
-                <div><span data-i18n="preview.downloaded">Downloaded</span><strong>1.84 GB</strong></div>
-                <div><span data-i18n="preview.uploaded">Uploaded</span><strong>286 MB</strong></div>
+              <div class="fyne-field">
+                <span>Server</span>
+                <div class="fyne-input">proxy.example.net</div>
               </div>
-              <div class="speed-row">
-                <span>↓ 8.4 MB/s</span>
-                <div class="speed-track"><i class="speed-download"></i></div>
+              <div class="fyne-field">
+                <span>Port</span>
+                <div class="fyne-input">1080</div>
               </div>
-              <div class="speed-row upload">
-                <span>↑ 1.2 MB/s</span>
-                <div class="speed-track"><i class="speed-upload"></i></div>
+              <div class="fyne-field">
+                <span>Username</span>
+                <div class="fyne-input">proxyuser</div>
+              </div>
+              <div class="fyne-field">
+                <span>Password</span>
+                <div class="fyne-input fyne-password"><b>••••••••••••</b><i>◉</i></div>
               </div>
             </div>
-            <div class="log-card" aria-hidden="true">
-              <p><span>12:41:03</span> Primary interface: en0</p>
-              <p><span>12:41:04</span> Embedded tun2socks ready</p>
-              <p class="success"><span>12:41:04</span> VPN connected successfully</p>
+            <div class="fyne-buttons">
+              <div class="fyne-button disabled">Connect</div>
+              <div class="fyne-button danger">Disconnect</div>
+            </div>
+            <div class="fyne-status">
+              <i></i>
+              <strong>Connected</strong>
+            </div>
+            <div class="fyne-traffic">
+              <strong>Session traffic: ↓ Download 1.84 GB&nbsp;&nbsp;&nbsp; ↑ Upload 286 MB</strong>
+              <span>Current speed</span>
+              <div class="fyne-meters">
+                <div class="fyne-meter"><i class="meter-download"></i><b>↓ 8.4 MB/s</b></div>
+                <div class="fyne-meter"><i class="meter-upload"></i><b>↑ 1.2 MB/s</b></div>
+              </div>
+            </div>
+            <p class="fyne-help">Run the application with administrator/root privileges to change system routes.</p>
+            <div class="fyne-logs" aria-hidden="true">
+              <p>2026/08/08 12:41:03 Platform: darwin/arm64</p>
+              <p>2026/08/08 12:41:03 SOCKS proxy: socks5://proxyuser:%2A%2A%2A@proxy.example.net:1080</p>
+              <p>2026/08/08 12:41:03 Primary interface: en0</p>
+              <p>2026/08/08 12:41:04 VPN connected. Press Ctrl+C to disconnect.</p>
             </div>
           </div>
         </div>
-        <div class="floating-chip chip-engine"><span>Go</span><div><strong data-i18n="chip.engine">Embedded engine</strong><small data-i18n="chip.process">No extra process</small></div></div>
-        <div class="floating-chip chip-shield"><span>✓</span><div><strong data-i18n="chip.rollback">Safe rollback</strong><small data-i18n="chip.routes">Routes restored</small></div></div>
       </div>
     </section>
 
