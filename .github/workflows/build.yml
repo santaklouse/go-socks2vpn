@@ -1,0 +1,281 @@
+name: Build, test, and release
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.3"
+          cache-dependency-path: |
+            go.sum
+            desktop-gui/go.sum
+      - name: Unit tests
+        run: go test ./...
+      - name: Race detector
+        run: go test -race ./...
+      - name: Go vet
+        run: go vet ./...
+      - name: GUI tests
+        run: go test ./...
+        working-directory: desktop-gui
+
+  cli:
+    name: CLI ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: darwin, goarch: amd64, executable: socks2vpn, asset: go-socks2vpn-cli-darwin-amd64.tar.gz, archive: tar }
+          - { goos: darwin, goarch: arm64, executable: socks2vpn, asset: go-socks2vpn-cli-darwin-arm64.tar.gz, archive: tar }
+          - { goos: linux, goarch: "386", executable: socks2vpn, asset: go-socks2vpn-cli-linux-386.tar.gz, archive: tar }
+          - { goos: linux, goarch: amd64, executable: socks2vpn, asset: go-socks2vpn-cli-linux-amd64.tar.gz, archive: tar }
+          - { goos: linux, goarch: arm, executable: socks2vpn, asset: go-socks2vpn-cli-linux-arm.tar.gz, archive: tar }
+          - { goos: linux, goarch: arm64, executable: socks2vpn, asset: go-socks2vpn-cli-linux-arm64.tar.gz, archive: tar }
+          - { goos: linux, goarch: riscv64, executable: socks2vpn, asset: go-socks2vpn-cli-linux-riscv64.tar.gz, archive: tar }
+          - { goos: windows, goarch: "386", executable: socks2vpn.exe, asset: go-socks2vpn-cli-windows-386.zip, archive: zip }
+          - { goos: windows, goarch: amd64, executable: socks2vpn.exe, asset: go-socks2vpn-cli-windows-amd64.zip, archive: zip }
+          - { goos: windows, goarch: arm64, executable: socks2vpn.exe, asset: go-socks2vpn-cli-windows-arm64.zip, archive: zip }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.3"
+      - name: Build CLI
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || github.sha }}
+        run: |
+          mkdir -p release-package
+          go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "release-package/${{ matrix.executable }}" ./cmd/socks2vpn
+      - name: Package tar.gz
+        if: matrix.archive == 'tar'
+        run: tar -C release-package -czf "${{ matrix.asset }}" "${{ matrix.executable }}"
+      - name: Package ZIP
+        if: matrix.archive == 'zip'
+        run: cd release-package && zip -9 "../${{ matrix.asset }}" "${{ matrix.executable }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  desktop-gui:
+    name: GUI ${{ matrix.platform }}/${{ matrix.goarch }}
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15, platform: macos, goarch: arm64, executable: socks2vpn-gui, asset: go-socks2vpn-gui-macos-arm64.tar.gz, archive: tar }
+          - { os: macos-15-intel, platform: macos, goarch: amd64, executable: socks2vpn-gui, asset: go-socks2vpn-gui-macos-amd64.tar.gz, archive: tar }
+          - { os: ubuntu-24.04, platform: linux, goarch: amd64, executable: socks2vpn-gui, asset: go-socks2vpn-gui-linux-amd64.tar.gz, archive: tar }
+          - { os: windows-2025, platform: windows, goarch: amd64, executable: socks2vpn-gui.exe, asset: go-socks2vpn-gui-windows-amd64.zip, archive: zip }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.3"
+          cache-dependency-path: |
+            go.sum
+            desktop-gui/go.sum
+      - name: Install Linux GUI libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev
+      - name: Build GUI
+        run: go build -trimpath -ldflags "-s -w" -o "../${{ matrix.executable }}" .
+        working-directory: desktop-gui
+      - name: Package tar.gz
+        if: matrix.archive == 'tar'
+        run: tar -czf "${{ matrix.asset }}" "${{ matrix.executable }}"
+      - name: Package ZIP
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: Compress-Archive -CompressionLevel Optimal -Path "${{ matrix.executable }}" -DestinationPath "${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-gui-${{ matrix.platform }}-${{ matrix.goarch }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  android:
+    name: Android APK
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.3"
+          cache-dependency-path: |
+            go.sum
+            android/enginebridge/go.sum
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK and NDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+      - name: Build installable debug APK
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+        run: ./gradlew --no-daemon assembleDebug
+        working-directory: android
+      - name: Prepare Android release signing
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag must look like v1.2.3 or v1.2.3-rc.1" >&2
+            exit 1
+          fi
+          for secret_name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!secret_name}" ]]; then
+              echo "Required GitHub Actions secret is missing: ${secret_name}" >&2
+              exit 1
+            fi
+          done
+          printf '%s' "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > android/release.keystore
+          echo "ANDROID_KEYSTORE_FILE=${GITHUB_WORKSPACE}/android/release.keystore" >> "${GITHUB_ENV}"
+          echo "RELEASE_VERSION_NAME=${GITHUB_REF_NAME#v}" >> "${GITHUB_ENV}"
+          echo "RELEASE_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "${GITHUB_ENV}"
+      - name: Build signed release APK
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon -PreleaseVersionName="${RELEASE_VERSION_NAME}" -PreleaseVersionCode="${RELEASE_VERSION_CODE}" assembleRelease
+        working-directory: android
+      - name: Name debug artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk go-socks2vpn-android-debug.apk
+      - name: Name release artifact
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: cp android/app/build/outputs/apk/release/app-release.apk go-socks2vpn-android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-android
+          path: go-socks2vpn-android*.apk
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  docker:
+    name: Docker image
+    needs:
+      - test
+      - cli
+      - desktop-gui
+      - android
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Log in to GitHub Container Registry
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
+      - name: Build and optionally publish image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || github.sha }}
+          cache-from: type=gha,scope=docker
+          cache-to: type=gha,mode=max,scope=docker
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - cli
+      - desktop-gui
+      - android
+      - docker
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Validate semantic version tag
+        shell: bash
+        run: |
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag must look like v1.2.3 or v1.2.3-rc.1" >&2
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Generate SHA-256 checksums
+        working-directory: release-assets
+        run: LC_ALL=C sha256sum * > SHA256SUMS
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          options=(--verify-tag --generate-notes --title "${GITHUB_REF_NAME}")
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            options+=(--prerelease)
+          fi
+          gh release create "${GITHUB_REF_NAME}" "${options[@]}" release-assets/*

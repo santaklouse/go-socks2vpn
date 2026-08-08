@@ -1,0 +1,4 @@
+-keep class go.** { *; }
+-keep class mobile.** { *; }
+-keep class org.golang.** { *; }
+-dontwarn org.golang.**

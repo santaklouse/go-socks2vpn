@@ -1,0 +1,12 @@
+.git
+.github
+.env
+*.jks
+*.keystore
+android
+bin
+desktop-gui
+dist
+docs
+*.log
+*.md

@@ -1,0 +1,65 @@
+name: go-socks2vpn
+
+services:
+  socks2vpn:
+    build:
+      context: .
+      args:
+        VERSION: docker
+    image: go-socks2vpn:local
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    command:
+      - --proxy=${SOCKS_PROXY:-socks4://192.168.192.100:9050}
+      - --interface=eth0
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        - CMD
+        - ip
+        - link
+        - show
+        - tun0
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  socks4-check:
+    profiles:
+      - check
+    build:
+      context: .
+      args:
+        VERSION: docker-check
+    image: go-socks2vpn:local
+    command:
+      - --proxy=socks4://${SOCKS4_TEST_SERVER:-192.168.192.100:9050}
+      - --check-proxy
+      - --check-target=1.1.1.1:443
+
+  traffic-check:
+    profiles:
+      - traffic
+    build:
+      context: .
+      args:
+        VERSION: docker-traffic-check
+    image: go-socks2vpn:local
+    network_mode: service:socks2vpn
+    depends_on:
+      socks2vpn:
+        condition: service_healthy
+    entrypoint:
+      - /usr/bin/curl
+    command:
+      - --silent
+      - --show-error
+      - --fail
+      - https://1.1.1.1/cdn-cgi/trace

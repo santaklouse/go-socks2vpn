@@ -1,0 +1,15 @@
+[Details]
+  Icon = "Icon.svg"
+  Name = "go-socks2vpn"
+  ID = "com.santaklouse.gosocks2vpn"
+  Version = "1.0.0"
+  Build = 1
+
+[LinuxAndBSD]
+  GenericName = "SOCKS VPN client"
+  Categories = ["Network"]
+  Comment = "Route device traffic through a SOCKS4 or SOCKS5 proxy"
+
+[Darwin]
+  Category = "public.app-category.utilities"
+  MinimumSystemVersion = "11.0"

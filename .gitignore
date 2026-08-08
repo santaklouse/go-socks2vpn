@@ -1,0 +1,16 @@
+bin/
+dist/
+*.log
+*.jks
+*.keystore
+.DS_Store
+tun2socks
+tun2socks.exe
+wintun.dll
+android/.gradle/
+android/local.properties
+android/app/build/
+android/app/libs/*.aar
+android/enginebridge/*.aar
+desktop-gui/build/
+desktop-gui/vendor/

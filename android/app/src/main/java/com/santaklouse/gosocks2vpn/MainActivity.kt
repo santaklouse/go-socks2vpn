@@ -1,0 +1,250 @@
+package com.santaklouse.gosocks2vpn
+
+import android.Manifest
+import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.graphics.Typeface
+import android.net.VpnService
+import android.os.Build
+import android.os.Bundle
+import android.text.InputType
+import android.view.Gravity
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.Spinner
+import android.widget.TextView
+import android.widget.Toast
+
+class MainActivity : Activity() {
+    private lateinit var protocolInput: Spinner
+    private lateinit var hostInput: EditText
+    private lateinit var portInput: EditText
+    private lateinit var usernameInput: EditText
+    private lateinit var passwordInput: EditText
+    private lateinit var statusView: TextView
+    private lateinit var connectButton: Button
+    private lateinit var disconnectButton: Button
+    private var pending: ProxyInput? = null
+
+    private val statusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val connected = intent?.getBooleanExtra(TunnelVpnService.EXTRA_CONNECTED, false) ?: false
+            val message = intent?.getStringExtra(TunnelVpnService.EXTRA_MESSAGE) ?: "Отключено"
+            updateStatus(connected, message)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        buildInterface()
+        restoreFields()
+        registerStatusReceiver()
+        requestNotificationPermission()
+    }
+
+    override fun onDestroy() {
+        unregisterReceiver(statusReceiver)
+        super.onDestroy()
+    }
+
+    @Deprecated("VpnService.prepare still uses the activity-result contract")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != VPN_PERMISSION_REQUEST) return
+        val configuration = pending
+        pending = null
+        if (resultCode == RESULT_OK && configuration != null) {
+            startTunnel(configuration)
+        } else {
+            updateStatus(false, "Разрешение VPN не предоставлено")
+        }
+    }
+
+    private fun buildInterface() {
+        val density = resources.displayMetrics.density
+        val padding = (20 * density).toInt()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding, padding, padding)
+        }
+
+        root.addView(TextView(this).apply {
+            text = "SOCKS4/SOCKS5 → системный VPN"
+            textSize = 22f
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(0, 0, 0, (16 * density).toInt())
+        })
+
+        root.addView(TextView(this).apply { text = "Протокол" })
+        protocolInput = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@MainActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                listOf("SOCKS5", "SOCKS4"),
+            )
+        }
+        root.addView(protocolInput, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        hostInput = addField(root, "Сервер", "proxy.example.com или 2001:db8::1")
+        portInput = addField(root, "Порт", "1080", InputType.TYPE_CLASS_NUMBER)
+        usernameInput = addField(root, "Пользователь", "необязательно")
+        passwordInput = addField(
+            root,
+            "Пароль",
+            "не сохраняется",
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD,
+        )
+
+        connectButton = Button(this).apply {
+            text = "Подключить"
+            setOnClickListener { requestConnection() }
+        }
+        disconnectButton = Button(this).apply {
+            text = "Отключить"
+            isEnabled = false
+            setOnClickListener {
+                startService(Intent(this@MainActivity, TunnelVpnService::class.java).apply {
+                    action = TunnelVpnService.ACTION_STOP
+                })
+            }
+        }
+        root.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(connectButton, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(disconnectButton, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        })
+
+        statusView = TextView(this).apply {
+            text = "Отключено"
+            textSize = 17f
+            gravity = Gravity.CENTER_HORIZONTAL
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(0, (18 * density).toInt(), 0, (10 * density).toInt())
+        }
+        root.addView(statusView)
+        root.addView(TextView(this).apply {
+            text = "Android покажет системный запрос на создание VPN. Пароль хранится только в памяти до отключения."
+            textSize = 14f
+        })
+        setContentView(ScrollView(this).apply { addView(root) })
+    }
+
+    private fun addField(parent: LinearLayout, label: String, hint: String, type: Int = InputType.TYPE_CLASS_TEXT): EditText {
+        parent.addView(TextView(this).apply { text = label })
+        return EditText(this).also { field ->
+            field.hint = hint
+            field.inputType = type
+            field.isSingleLine = true
+            parent.addView(field, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+    }
+
+    private fun requestConnection() {
+        val configuration = validateFields() ?: return
+        saveNonSecretFields(configuration)
+        val permissionIntent = VpnService.prepare(this)
+        if (permissionIntent == null) {
+            startTunnel(configuration)
+        } else {
+            pending = configuration
+            @Suppress("DEPRECATION")
+            startActivityForResult(permissionIntent, VPN_PERMISSION_REQUEST)
+        }
+    }
+
+    private fun startTunnel(configuration: ProxyInput) {
+		updateStatus(true, "Подключение…")
+        val intent = Intent(this, TunnelVpnService::class.java).apply {
+            action = TunnelVpnService.ACTION_START
+            putExtra(TunnelVpnService.EXTRA_HOST, configuration.host)
+            putExtra(TunnelVpnService.EXTRA_SCHEME, configuration.scheme)
+            putExtra(TunnelVpnService.EXTRA_PORT, configuration.port)
+            putExtra(TunnelVpnService.EXTRA_USERNAME, configuration.username)
+            putExtra(TunnelVpnService.EXTRA_PASSWORD, configuration.password)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+    }
+
+    private fun validateFields(): ProxyInput? {
+        val scheme = protocolInput.selectedItem.toString().lowercase()
+        val host = hostInput.text.toString().trim().removePrefix("[").removeSuffix("]")
+        val port = portInput.text.toString().trim().toIntOrNull()
+        val username = usernameInput.text.toString()
+        val password = passwordInput.text.toString()
+        val error = when {
+            host.isEmpty() || host.any { it.isWhitespace() || it == '/' || it == '\\' } -> "Укажите корректный адрес сервера"
+            port == null || port !in 1..65535 -> "Порт должен быть числом от 1 до 65535"
+            username.isEmpty() && password.isNotEmpty() -> "Пароль задан без пользователя"
+            scheme == "socks4" && password.isNotEmpty() -> "SOCKS4 поддерживает user ID, но не пароль"
+            else -> null
+        }
+        if (error != null) {
+            Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+            return null
+        }
+        return ProxyInput(scheme, host, port!!, username, password)
+    }
+
+    private fun updateStatus(connected: Boolean, message: String) {
+        statusView.text = message
+        connectButton.isEnabled = !connected
+        disconnectButton.isEnabled = connected
+    }
+
+    private fun saveNonSecretFields(input: ProxyInput) {
+        getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit()
+            .putString("host", input.host)
+            .putString("scheme", input.scheme)
+            .putInt("port", input.port)
+            .putString("username", input.username)
+            .apply()
+    }
+
+    private fun restoreFields() {
+        val preferences = getSharedPreferences(PREFERENCES, MODE_PRIVATE)
+        protocolInput.setSelection(if (preferences.getString("scheme", "socks5") == "socks4") 1 else 0)
+        hostInput.setText(preferences.getString("host", ""))
+        portInput.setText(preferences.getInt("port", 1080).toString())
+        usernameInput.setText(preferences.getString("username", ""))
+    }
+
+    private fun registerStatusReceiver() {
+        val filter = IntentFilter(TunnelVpnService.ACTION_STATUS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(statusReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(statusReceiver, filter)
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
+        }
+    }
+
+    private data class ProxyInput(
+        val scheme: String,
+        val host: String,
+        val port: Int,
+        val username: String,
+        val password: String,
+    )
+
+    companion object {
+        private const val VPN_PERMISSION_REQUEST = 100
+        private const val NOTIFICATION_PERMISSION_REQUEST = 101
+        private const val PREFERENCES = "proxy"
+    }
+}
