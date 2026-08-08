@@ -2,6 +2,8 @@
 
 English | [Russian](README.RU.md)
 
+[Website](https://santaklouse.github.io/go-socks2vpn/) · [Latest release](https://github.com/santaklouse/go-socks2vpn/releases/latest)
+
 [![CI](https://github.com/santaklouse/go-socks2vpn/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/santaklouse/go-socks2vpn/actions/workflows/build.yml)
 [![Latest tag](https://img.shields.io/github/v/tag/santaklouse/go-socks2vpn)](https://github.com/santaklouse/go-socks2vpn/tags)
 [![Go version](https://img.shields.io/github/go-mod/go-version/santaklouse/go-socks2vpn)](https://github.com/santaklouse/go-socks2vpn/blob/main/go.mod)

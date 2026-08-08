@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111f">
+  <meta name="description" content="Turn any SOCKS4 or SOCKS5 proxy into a system-wide VPN on macOS, Linux, Windows, Android, and Docker.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="go-socks2vpn — Your SOCKS proxy, system-wide">
+  <meta property="og:description" content="A fast, source-available SOCKS4/SOCKS5-to-VPN client for desktop, Android, and Docker.">
+  <meta property="og:url" content="https://santaklouse.github.io/go-socks2vpn/">
+  <meta property="og:image" content="https://santaklouse.github.io/go-socks2vpn/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="go-socks2vpn — Your SOCKS proxy, system-wide">
+  <meta name="twitter:description" content="A fast, source-available SOCKS4/SOCKS5-to-VPN client for desktop, Android, and Docker.">
+  <meta name="twitter:image" content="https://santaklouse.github.io/go-socks2vpn/og.png">
+  <link rel="canonical" href="https://santaklouse.github.io/go-socks2vpn/">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
+  <title>go-socks2vpn — Your SOCKS proxy, system-wide</title>
+</head>
+<body>
+  <a class="skip-link" href="#main" data-i18n="skip">Skip to content</a>
+  <div class="page-glow page-glow-one" aria-hidden="true"></div>
+  <div class="page-glow page-glow-two" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <nav class="nav shell" aria-label="Primary navigation">
+      <a class="brand" href="#top" aria-label="go-socks2vpn home">
+        <img src="favicon.svg" width="38" height="38" alt="">
+        <span>go-socks2vpn</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features" data-i18n="nav.features">Features</a>
+        <a href="#how" data-i18n="nav.how">How it works</a>
+        <a href="#install" data-i18n="nav.install">Install</a>
+        <a href="https://github.com/santaklouse/go-socks2vpn" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+      <div class="nav-actions">
+        <button class="language-toggle" type="button" aria-label="Switch language">
+          <span data-language-option="en">EN</span>
+          <span data-language-option="ru">RU</span>
+        </button>
+        <a class="button button-small button-ghost" href="https://github.com/santaklouse/go-socks2vpn/releases/latest" target="_blank" rel="noreferrer" data-i18n="nav.download">Download</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero shell" id="top">
+      <div class="hero-copy reveal">
+        <div class="eyebrow"><span class="pulse-dot"></span><span data-i18n="hero.eyebrow">Source available · Native · Cross-platform</span></div>
+        <h1 data-i18n-html="hero.title">Your SOCKS proxy.<br><span>Now system-wide.</span></h1>
+        <p class="hero-lead" data-i18n="hero.lead">Turn a SOCKS4 or SOCKS5 server into a full-device VPN with one lightweight Go client. No external tun2socks process. No browser extensions.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#install">
+            <span data-i18n="hero.install">Install go-socks2vpn</span>
+            <span aria-hidden="true">→</span>
+          </a>
+          <a class="button button-ghost" href="https://github.com/santaklouse/go-socks2vpn" target="_blank" rel="noreferrer">
+            <span class="github-mark" aria-hidden="true">⌘</span>
+            <span data-i18n="hero.source">View source</span>
+          </a>
+        </div>
+        <div class="hero-proof" role="group" aria-label="Supported platforms">
+          <span>macOS</span><i></i><span>Linux</span><i></i><span>Windows</span><i></i><span>Android</span><i></i><span>Docker</span>
+        </div>
+      </div>
+
+      <div class="app-stage reveal reveal-delay" role="group" aria-label="Application preview">
+        <div class="orbit orbit-one" aria-hidden="true"></div>
+        <div class="orbit orbit-two" aria-hidden="true"></div>
+        <div class="app-window">
+          <div class="window-bar">
+            <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="window-title">go-socks2vpn</div>
+            <div class="window-version">latest</div>
+          </div>
+          <div class="window-content">
+            <div class="preview-heading">
+              <div>
+                <span class="preview-kicker" data-i18n="preview.kicker">SOCKS → SYSTEM VPN</span>
+                <h2 data-i18n="preview.title">Connection</h2>
+              </div>
+              <div class="connected-badge"><span></span><span data-i18n="preview.connected">Connected</span></div>
+            </div>
+            <div class="preview-fields">
+              <div class="preview-field preview-field-small"><span data-i18n="preview.protocol">Protocol</span><strong>SOCKS5</strong></div>
+              <div class="preview-field"><span data-i18n="preview.server">Server</span><strong>proxy.example.net</strong></div>
+              <div class="preview-field preview-field-port"><span data-i18n="preview.port">Port</span><strong>1080</strong></div>
+            </div>
+            <div class="preview-button-row">
+              <div class="preview-button active" data-i18n="preview.disconnect">Disconnect</div>
+              <div class="session-time"><span data-i18n="preview.session">Session</span> <strong>01:42:18</strong></div>
+            </div>
+            <div class="stats-card">
+              <div class="stats-top">
+                <div><span data-i18n="preview.downloaded">Downloaded</span><strong>1.84 GB</strong></div>
+                <div><span data-i18n="preview.uploaded">Uploaded</span><strong>286 MB</strong></div>
+              </div>
+              <div class="speed-row">
+                <span>↓ 8.4 MB/s</span>
+                <div class="speed-track"><i class="speed-download"></i></div>
+              </div>
+              <div class="speed-row upload">
+                <span>↑ 1.2 MB/s</span>
+                <div class="speed-track"><i class="speed-upload"></i></div>
+              </div>
+            </div>
+            <div class="log-card" aria-hidden="true">
+              <p><span>12:41:03</span> Primary interface: en0</p>
+              <p><span>12:41:04</span> Embedded tun2socks ready</p>
+              <p class="success"><span>12:41:04</span> VPN connected successfully</p>
+            </div>
+          </div>
+        </div>
+        <div class="floating-chip chip-engine"><span>Go</span><div><strong data-i18n="chip.engine">Embedded engine</strong><small data-i18n="chip.process">No extra process</small></div></div>
+        <div class="floating-chip chip-shield"><span>✓</span><div><strong data-i18n="chip.rollback">Safe rollback</strong><small data-i18n="chip.routes">Routes restored</small></div></div>
+      </div>
+    </section>
+
+    <section class="trust-strip" aria-label="Project highlights">
+      <div class="shell trust-grid">
+        <div><strong>5</strong><span data-i18n="trust.platforms">platforms</span></div>
+        <div><strong>2</strong><span data-i18n="trust.protocols">SOCKS protocols</span></div>
+        <div><strong>0</strong><span data-i18n="trust.processes">external processes</span></div>
+        <div><strong>100%</strong><span data-i18n="trust.opensource">public source</span></div>
+      </div>
+    </section>
+
+    <section class="section shell" id="features">
+      <div class="section-heading reveal">
+        <div class="eyebrow" data-i18n="features.eyebrow">One tunnel. Every app.</div>
+        <h2 data-i18n-html="features.title">Built for the traffic<br><span>your browser cannot reach.</span></h2>
+        <p data-i18n="features.lead">Route applications that do not understand SOCKS through the same proxy—without configuring each one separately.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card feature-card-wide reveal">
+          <div class="feature-icon route-icon" aria-hidden="true"><span></span><i></i><b></b></div>
+          <div>
+            <h3 data-i18n="features.system.title">System-wide routing</h3>
+            <p data-i18n="features.system.text">Desktop routes are configured automatically and restored when the tunnel stops. Android uses the native, rootless VpnService.</p>
+          </div>
+          <div class="route-visual" aria-hidden="true">
+            <div class="route-node">APP</div><span></span><div class="route-node active">TUN</div><span></span><div class="route-node">SOCKS</div>
+          </div>
+        </article>
+        <article class="feature-card reveal">
+          <div class="feature-icon">↯</div>
+          <h3 data-i18n="features.engine.title">Embedded Go engine</h3>
+          <p data-i18n="features.engine.text">tun2socks is compiled directly into the client as a Go dependency. Nothing extra to download or supervise.</p>
+        </article>
+        <article class="feature-card reveal">
+          <div class="feature-icon">◴</div>
+          <h3 data-i18n="features.stats.title">Live traffic stats</h3>
+          <p data-i18n="features.stats.text">See session totals and current download/upload speed in the GUI or enable them in the CLI.</p>
+        </article>
+        <article class="feature-card reveal">
+          <div class="feature-icon">⌁</div>
+          <h3 data-i18n="features.dns.title">Browser-ready DNS</h3>
+          <p data-i18n="features.dns.text">Android sends DNS-over-HTTPS through SOCKS and forces reliable TCP fallback when QUIC is unavailable.</p>
+        </article>
+        <article class="feature-card reveal">
+          <div class="feature-icon">⌘</div>
+          <h3 data-i18n="features.links.title">One-tap configuration</h3>
+          <p data-i18n="features.links.text">Open a socks2vpn:// link to fill the GUI safely. The application never connects automatically.</p>
+        </article>
+        <article class="feature-card reveal">
+          <div class="feature-icon">◇</div>
+          <h3 data-i18n="features.verify.title">Verified releases</h3>
+          <p data-i18n="features.verify.text">Every release includes SHA-256 checksums. Windows verifies Wintun before loading it.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section how-section" id="how">
+      <div class="shell">
+        <div class="section-heading section-heading-centered reveal">
+          <div class="eyebrow" data-i18n="how.eyebrow">Simple by design</div>
+          <h2 data-i18n="how.title">From proxy to full tunnel in three steps.</h2>
+        </div>
+        <div class="steps">
+          <article class="step reveal">
+            <span class="step-number">01</span>
+            <div class="step-icon">⌁</div>
+            <h3 data-i18n="how.one.title">Enter your proxy</h3>
+            <p data-i18n="how.one.text">Choose SOCKS4 or SOCKS5 and provide the server details. Credentials stay in process memory.</p>
+          </article>
+          <div class="step-connector" aria-hidden="true"><i></i></div>
+          <article class="step reveal">
+            <span class="step-number">02</span>
+            <div class="step-icon">⇄</div>
+            <h3 data-i18n="how.two.title">Create the tunnel</h3>
+            <p data-i18n="how.two.text">The embedded engine opens a TUN interface and keeps the proxy connection outside its own route.</p>
+          </article>
+          <div class="step-connector" aria-hidden="true"><i></i></div>
+          <article class="step reveal">
+            <span class="step-number">03</span>
+            <div class="step-icon">✓</div>
+            <h3 data-i18n="how.three.title">Use any application</h3>
+            <p data-i18n="how.three.text">Your TCP traffic follows the proxy. SOCKS5 can also carry UDP when the server supports it.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section shell install-section" id="install">
+      <div class="section-heading reveal">
+        <div class="eyebrow" data-i18n="install.eyebrow">Ready when you are</div>
+        <h2 data-i18n="install.title">Install in under a minute.</h2>
+        <p data-i18n="install.lead">Choose your platform. Releases are built automatically and published with checksums.</p>
+      </div>
+      <div class="install-panel reveal">
+        <div class="install-tabs" role="tablist" aria-label="Installation platform">
+          <button type="button" role="tab" aria-selected="true" aria-controls="install-panel" id="tab-unix" data-tab="unix">macOS / Linux</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="install-panel" id="tab-windows" data-tab="windows" tabindex="-1">Windows</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="install-panel" id="tab-android" data-tab="android" tabindex="-1">Android</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="install-panel" id="tab-cli" data-tab="cli" tabindex="-1">CLI</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="install-panel" id="tab-docker" data-tab="docker" tabindex="-1">Docker</button>
+        </div>
+        <div class="install-content" id="install-panel" role="tabpanel" aria-labelledby="tab-unix">
+          <div class="install-copy">
+            <span class="install-label" data-i18n="install.command">TERMINAL</span>
+            <h3 id="install-title" data-i18n="install.unix.title">Install the desktop GUI</h3>
+            <p id="install-description" data-i18n="install.unix.text">Detects your OS and CPU, verifies SHA-256, and registers configuration links.</p>
+          </div>
+          <div class="code-shell">
+            <div class="code-top"><span>go-socks2vpn</span><button type="button" class="copy-button" data-i18n="install.copy">Copy</button></div>
+            <pre><code id="install-code">curl -fsSL https://raw.githubusercontent.com/santaklouse/go-socks2vpn/main/scripts/install-gui.sh | sh</code></pre>
+          </div>
+          <div class="install-note">
+            <span>i</span>
+            <p id="install-note" data-i18n="install.unix.note">Launch with administrator privileges so the app can create routes. The GUI will alert you if privileges are missing.</p>
+          </div>
+          <div class="install-links">
+            <a id="install-primary-link" class="button button-primary" href="https://github.com/santaklouse/go-socks2vpn/releases/latest" target="_blank" rel="noreferrer"><span data-i18n="install.release">Latest release</span><span>↗</span></a>
+            <a class="text-link" href="https://github.com/santaklouse/go-socks2vpn#desktop-gui" target="_blank" rel="noreferrer" data-i18n="install.docs">Read installation docs →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section shell security-section">
+      <div class="security-card reveal">
+        <div class="security-copy">
+          <div class="eyebrow" data-i18n="security.eyebrow">Transparent and inspectable</div>
+          <h2 data-i18n="security.title">Your tunnel should not be a black box.</h2>
+          <p data-i18n="security.text">The source is public, the client uses an embedded Go network stack, keeps passwords out of preferences, verifies native downloads, and restores network settings after a normal shutdown.</p>
+          <a class="text-link" href="https://github.com/santaklouse/go-socks2vpn" target="_blank" rel="noreferrer" data-i18n="security.link">Inspect the source on GitHub →</a>
+        </div>
+        <div class="security-checks">
+          <div><span>✓</span><p><strong data-i18n="security.one.title">No proxy password storage</strong><small data-i18n="security.one.text">Secrets remain in memory only</small></p></div>
+          <div><span>✓</span><p><strong data-i18n="security.two.title">Automatic route rollback</strong><small data-i18n="security.two.text">Clean restoration on shutdown</small></p></div>
+          <div><span>✓</span><p><strong data-i18n="security.three.title">Reproducible release pipeline</strong><small data-i18n="security.three.text">Multi-platform CI and checksums</small></p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="final-cta">
+      <div class="shell final-cta-inner reveal">
+        <img src="favicon.svg" width="72" height="72" alt="">
+        <div>
+          <h2 data-i18n="cta.title">Make your SOCKS proxy useful everywhere.</h2>
+          <p data-i18n="cta.text">Download the latest release and connect your whole device in minutes.</p>
+        </div>
+        <a class="button button-light" href="https://github.com/santaklouse/go-socks2vpn/releases/latest" target="_blank" rel="noreferrer"><span data-i18n="cta.button">Get go-socks2vpn</span><span>→</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <div class="brand footer-brand"><img src="favicon.svg" width="34" height="34" alt=""><span>go-socks2vpn</span></div>
+      <p><span data-i18n="footer.made">Built in Go. Source available on GitHub.</span> <span>© <span id="year">2026</span></span></p>
+      <div class="footer-links"><a href="https://github.com/santaklouse/go-socks2vpn" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/santaklouse/go-socks2vpn/releases" target="_blank" rel="noreferrer" data-i18n="footer.releases">Releases</a><a href="https://github.com/santaklouse/go-socks2vpn/issues" target="_blank" rel="noreferrer" data-i18n="footer.issues">Issues</a></div>
+    </div>
+  </footer>
+</body>
+</html>

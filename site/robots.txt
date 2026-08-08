@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://santaklouse.github.io/go-socks2vpn/sitemap.xml
