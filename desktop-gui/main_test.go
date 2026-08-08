@@ -1,6 +1,7 @@
 package main
 
 import (
+	"image/color"
 	"strings"
 	"testing"
 
@@ -26,6 +27,36 @@ func TestPrivilegeMessage(t *testing.T) {
 				t.Fatalf("privilegeMessage(%q) = %q, expected text %q", test.goos, message, test.expected)
 			}
 		})
+	}
+}
+
+func TestConnectionStateColors(t *testing.T) {
+	tests := []struct {
+		state connectionState
+		want  color.Color
+	}{
+		{stateDisconnected, disconnectedColor},
+		{stateConnecting, connectingColor},
+		{stateConnected, connectedColor},
+		{stateDisconnecting, connectingColor},
+	}
+	for _, test := range tests {
+		if got := test.state.color(); got != test.want {
+			t.Errorf("state %d color = %v, want %v", test.state, got, test.want)
+		}
+	}
+}
+
+func TestSpeedMeterScale(t *testing.T) {
+	for value, want := range map[uint64]uint64{
+		0:       1 << 10,
+		1 << 10: 1 << 10,
+		1 << 11: 1 << 13,
+		1 << 20: 1 << 22,
+	} {
+		if got := speedMeterScale(value); got != want {
+			t.Errorf("speedMeterScale(%d) = %d, want %d", value, got, want)
+		}
 	}
 }
 

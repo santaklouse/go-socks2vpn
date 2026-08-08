@@ -28,3 +28,9 @@ func TestOpenDeviceValidation(t *testing.T) {
 		t.Fatal("empty device unexpectedly accepted")
 	}
 }
+
+func TestStoppedEngineStatisticsAreZero(t *testing.T) {
+	if got := New().Statistics(); got != (Statistics{}) {
+		t.Fatalf("new engine statistics = %#v", got)
+	}
+}

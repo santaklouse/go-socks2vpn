@@ -27,6 +27,7 @@ func run() int {
 	gateway := flag.String("gateway", "", "primary IPv4 gateway (usually detected automatically)")
 	dns := flag.String("dns", "8.8.8.8", "DNS server for the Windows TUN interface")
 	dryRun := flag.Bool("dry-run", false, "show the plan without changing the network or downloading files")
+	showStats := flag.Bool("stats", false, "print session traffic totals and current transfer rates once per second")
 	checkProxy := flag.Bool("check-proxy", false, "test the proxy TCP handshake without creating a VPN")
 	checkTarget := flag.String("check-target", "1.1.1.1:443", "TCP address used by --check-proxy")
 	showVersion := flag.Bool("version", false, "show the version")
@@ -65,14 +66,27 @@ func run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	logger := log.New(os.Stdout, "", log.LstdFlags)
+	var statistics func(client.Statistics)
+	if *showStats {
+		statistics = func(value client.Statistics) {
+			logger.Printf(
+				"Traffic: download=%s (%s), upload=%s (%s)",
+				client.FormatBytes(value.DownloadedBytes),
+				client.FormatRate(value.DownloadBytesPerSecond),
+				client.FormatBytes(value.UploadedBytes),
+				client.FormatRate(value.UploadBytesPerSecond),
+			)
+		}
+	}
 	err := client.Run(ctx, client.Options{
-		Proxy:     *proxy,
-		CacheDir:  *cacheDir,
-		Interface: *interfaceName,
-		Gateway:   *gateway,
-		DNS:       *dns,
-		DryRun:    *dryRun,
-		Log:       logger,
+		Proxy:      *proxy,
+		CacheDir:   *cacheDir,
+		Interface:  *interfaceName,
+		Gateway:    *gateway,
+		DNS:        *dns,
+		DryRun:     *dryRun,
+		Log:        logger,
+		Statistics: statistics,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)

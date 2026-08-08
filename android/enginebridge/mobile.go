@@ -48,3 +48,25 @@ func Stop() {
 	current.Stop()
 	current = nil
 }
+
+// UploadedBytes returns the number of IP bytes sent by applications through
+// the VPN during the current session.
+func UploadedBytes() int64 {
+	mu.Lock()
+	defer mu.Unlock()
+	if current == nil {
+		return 0
+	}
+	return int64(current.Statistics().UploadedBytes)
+}
+
+// DownloadedBytes returns the number of IP bytes delivered from the VPN to
+// applications during the current session.
+func DownloadedBytes() int64 {
+	mu.Lock()
+	defer mu.Unlock()
+	if current == nil {
+		return 0
+	}
+	return int64(current.Statistics().DownloadedBytes)
+}

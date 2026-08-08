@@ -37,6 +37,14 @@ type Engine struct {
 	stack  *stack.Stack
 }
 
+// Statistics contains IP traffic counters for the current engine session.
+// UploadedBytes is traffic received from the TUN device; DownloadedBytes is
+// traffic written back to it.
+type Statistics struct {
+	UploadedBytes   uint64
+	DownloadedBytes uint64
+}
+
 func New() *Engine {
 	return &Engine{}
 }
@@ -129,6 +137,23 @@ func (e *Engine) Stop() {
 		e.stack = nil
 	}
 	dialer.Reset()
+}
+
+// Statistics returns a point-in-time snapshot of the current TUN session.
+// A stopped or not-yet-started engine reports zeroes.
+func (e *Engine) Statistics() Statistics {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.stack == nil {
+		return Statistics{}
+	}
+
+	var result Statistics
+	for _, nic := range e.stack.NICInfo() {
+		result.UploadedBytes += nic.Stats.Rx.Bytes.Value()
+		result.DownloadedBytes += nic.Stats.Tx.Bytes.Value()
+	}
+	return result
 }
 
 func openDevice(raw string, mtu uint32) (device.Device, error) {

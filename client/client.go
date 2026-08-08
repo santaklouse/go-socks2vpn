@@ -28,13 +28,15 @@ type Logger interface {
 }
 
 type Options struct {
-	Proxy     string
-	CacheDir  string
-	Interface string
-	Gateway   string
-	DNS       string
-	DryRun    bool
-	Log       Logger
+	Proxy       string
+	CacheDir    string
+	Interface   string
+	Gateway     string
+	DNS         string
+	DryRun      bool
+	Log         Logger
+	Statistics  func(Statistics)
+	OnConnected func()
 }
 
 // Run validates the configuration, prepares the host network, runs tun2socks,
@@ -154,8 +156,26 @@ func Run(ctx context.Context, options Options) error {
 	}
 
 	logger.Printf("VPN connected. Press Ctrl+C to disconnect.")
+	if options.OnConnected != nil {
+		options.OnConnected()
+	}
+	var stopStatistics context.CancelFunc
+	var statisticsDone chan struct{}
+	if options.Statistics != nil {
+		var statisticsContext context.Context
+		statisticsContext, stopStatistics = context.WithCancel(context.Background())
+		statisticsDone = make(chan struct{})
+		go func() {
+			defer close(statisticsDone)
+			watchStatistics(statisticsContext, embedded.Statistics, options.Statistics, statisticsInterval)
+		}()
+	}
 	<-ctx.Done()
 	logger.Printf("Disconnect signal received")
+	if stopStatistics != nil {
+		stopStatistics()
+		<-statisticsDone
+	}
 
 	rollbackWithTimeout(session)
 	embedded.Stop()

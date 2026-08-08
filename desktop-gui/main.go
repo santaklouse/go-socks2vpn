@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"image/color"
 	"log"
 	"os"
 	"runtime"
@@ -12,6 +14,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
@@ -30,7 +33,7 @@ func main() {
 		showPrivilegeAlert(a, w, runtime.GOOS)
 		return
 	}
-	w.Resize(fyne.NewSize(520, 520))
+	w.Resize(fyne.NewSize(620, 650))
 
 	prefs := a.Preferences()
 	protocol := widget.NewSelect([]string{"SOCKS5", "SOCKS4"}, nil)
@@ -70,29 +73,47 @@ func main() {
 	}
 	status := widget.NewLabel(initialStatus)
 	status.TextStyle = fyne.TextStyle{Bold: true}
-	logs := widget.NewMultiLineEntry()
-	logs.Disable()
-	logs.SetMinRowsVisible(10)
+	connectionLamp := canvas.NewCircle(disconnectedColor)
+	connectionLamp.StrokeColor = color.NRGBA{R: 0x55, G: 0x55, B: 0x55, A: 0xff}
+	connectionLamp.StrokeWidth = 1
+	statusRow := container.NewHBox(
+		container.NewGridWrap(fyne.NewSize(16, 16), connectionLamp),
+		status,
+	)
+	logs := widget.NewTextGrid()
+	logs.Scroll = fyne.ScrollBoth
+	logBackground := canvas.NewRectangle(logBackgroundColor)
+	logBackground.CornerRadius = 5
+	logView := container.NewStack(logBackground, logs)
+	logWriter := newGUIWriter(logs)
+	traffic := newTrafficPanel()
 
 	var mu sync.Mutex
 	var cancel context.CancelFunc
 	var runDone <-chan struct{}
 	var connectButton, disconnectButton *widget.Button
-	setConnected := func(running bool, message string) {
+	setConnectionState := func(state connectionState, message string) {
 		fyne.Do(func() {
 			status.SetText(message)
-			if running {
+			connectionLamp.FillColor = state.color()
+			connectionLamp.Refresh()
+			switch state {
+			case stateConnecting, stateConnected:
 				connectButton.Disable()
 				disconnectButton.Enable()
-			} else {
+			case stateDisconnecting:
+				connectButton.Disable()
+				disconnectButton.Disable()
+			default:
 				connectButton.Enable()
 				disconnectButton.Disable()
 			}
 		})
 	}
-	logger := log.New(&guiWriter{entry: logs}, "", log.LstdFlags)
+	logger := log.New(logWriter, "", log.LstdFlags)
 
 	disconnectButton = widget.NewButton("Disconnect", func() {
+		setConnectionState(stateDisconnecting, "Disconnecting…")
 		mu.Lock()
 		if cancel != nil {
 			cancel()
@@ -105,34 +126,47 @@ func main() {
 	connectButton = widget.NewButton("Connect", func() {
 		proxyURL, err := makeProxyURL(protocol.Selected, host.Text, port.Text, username.Text, password.Text)
 		if err != nil {
-			setConnected(false, "Error: "+err.Error())
+			setConnectionState(stateDisconnected, "Error: "+err.Error())
 			return
 		}
 		prefs.SetString("host", strings.TrimSpace(host.Text))
 		prefs.SetString("port", strings.TrimSpace(port.Text))
 		prefs.SetString("username", username.Text)
 		prefs.SetString("protocol", protocol.Selected)
-		logs.SetText("")
+		logWriter.Reset()
+		traffic.Reset()
 		ctx, stop := context.WithCancel(context.Background())
 		done := make(chan struct{})
 		mu.Lock()
 		cancel = stop
 		runDone = done
 		mu.Unlock()
-		setConnected(true, "Connecting…")
+		setConnectionState(stateConnecting, "Connecting…")
 		go func() {
 			defer close(done)
-			err := client.Run(ctx, client.Options{Proxy: proxyURL, DNS: "8.8.8.8", Log: logger})
+			err := client.Run(ctx, client.Options{
+				Proxy:      proxyURL,
+				DNS:        "8.8.8.8",
+				Log:        logger,
+				Statistics: traffic.Update,
+				OnConnected: func() {
+					setConnectionState(stateConnected, "Connected")
+				},
+			})
 			mu.Lock()
 			cancel = nil
 			runDone = nil
 			mu.Unlock()
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					setConnectionState(stateDisconnected, "Disconnected")
+					return
+				}
 				logger.Printf("Error: %v", err)
-				setConnected(false, "Connection failed")
+				setConnectionState(stateDisconnected, "Connection failed")
 				return
 			}
-			setConnected(false, "Disconnected")
+			setConnectionState(stateDisconnected, "Disconnected")
 		}()
 	})
 	connectButton.Importance = widget.HighImportance
@@ -148,9 +182,16 @@ func main() {
 	help := widget.NewLabel("Run the application with administrator/root privileges to change system routes.")
 	help.Wrapping = fyne.TextWrapWord
 	w.SetContent(container.NewBorder(
-		container.NewVBox(widget.NewLabelWithStyle("SOCKS4/SOCKS5 → system VPN", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}), form, buttons, status, help),
+		container.NewVBox(
+			widget.NewLabelWithStyle("SOCKS4/SOCKS5 → system VPN", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+			form,
+			buttons,
+			statusRow,
+			traffic.View,
+			help,
+		),
 		nil, nil, nil,
-		container.NewScroll(logs),
+		logView,
 	))
 	w.SetCloseIntercept(func() {
 		mu.Lock()
@@ -163,7 +204,7 @@ func main() {
 			return
 		}
 		stop()
-		setConnected(true, "Disconnecting…")
+		setConnectionState(stateDisconnecting, "Disconnecting…")
 		go func() {
 			if done != nil {
 				<-done
@@ -250,24 +291,143 @@ func makeProxyURL(protocol, hostText, portText, username, password string) (stri
 	return settings.URL(), nil
 }
 
+type connectionState uint8
+
+const (
+	stateDisconnected connectionState = iota
+	stateConnecting
+	stateConnected
+	stateDisconnecting
+)
+
+var (
+	disconnectedColor  = color.NRGBA{R: 0xd9, G: 0x32, B: 0x32, A: 0xff}
+	connectingColor    = color.NRGBA{R: 0xf0, G: 0xa2, B: 0x02, A: 0xff}
+	connectedColor     = color.NRGBA{R: 0x20, G: 0xb1, B: 0x5a, A: 0xff}
+	logBackgroundColor = color.NRGBA{R: 0x18, G: 0x1b, B: 0x20, A: 0xff}
+	logForegroundColor = color.NRGBA{R: 0xe8, G: 0xea, B: 0xed, A: 0xff}
+)
+
+func (s connectionState) color() color.Color {
+	switch s {
+	case stateConnecting, stateDisconnecting:
+		return connectingColor
+	case stateConnected:
+		return connectedColor
+	default:
+		return disconnectedColor
+	}
+}
+
+type trafficPanel struct {
+	View          fyne.CanvasObject
+	totals        *widget.Label
+	downloadMeter *widget.ProgressBar
+	uploadMeter   *widget.ProgressBar
+	downloadRate  uint64
+	uploadRate    uint64
+}
+
+func newTrafficPanel() *trafficPanel {
+	panel := &trafficPanel{
+		totals:        widget.NewLabel("Session traffic: ↓ Download 0 B    ↑ Upload 0 B"),
+		downloadMeter: widget.NewProgressBar(),
+		uploadMeter:   widget.NewProgressBar(),
+	}
+	panel.downloadMeter.TextFormatter = func() string {
+		return "↓ " + client.FormatRate(panel.downloadRate)
+	}
+	panel.uploadMeter.TextFormatter = func() string {
+		return "↑ " + client.FormatRate(panel.uploadRate)
+	}
+	panel.View = container.NewVBox(
+		panel.totals,
+		widget.NewLabel("Current speed"),
+		container.NewGridWithColumns(2, panel.downloadMeter, panel.uploadMeter),
+	)
+	panel.apply(client.Statistics{})
+	return panel
+}
+
+func (p *trafficPanel) Reset() {
+	p.apply(client.Statistics{})
+}
+
+func (p *trafficPanel) Update(value client.Statistics) {
+	fyne.Do(func() { p.apply(value) })
+}
+
+func (p *trafficPanel) apply(value client.Statistics) {
+	p.downloadRate = value.DownloadBytesPerSecond
+	p.uploadRate = value.UploadBytesPerSecond
+	p.totals.SetText(fmt.Sprintf(
+		"Session traffic: ↓ Download %s    ↑ Upload %s",
+		client.FormatBytes(value.DownloadedBytes),
+		client.FormatBytes(value.UploadedBytes),
+	))
+	scale := speedMeterScale(max(value.DownloadBytesPerSecond, value.UploadBytesPerSecond))
+	p.downloadMeter.Max = float64(scale)
+	p.uploadMeter.Max = float64(scale)
+	p.downloadMeter.SetValue(float64(value.DownloadBytesPerSecond))
+	p.uploadMeter.SetValue(float64(value.UploadBytesPerSecond))
+}
+
+func speedMeterScale(value uint64) uint64 {
+	scale := uint64(1 << 10)
+	for scale < value && scale <= ^uint64(0)/8 {
+		scale *= 8
+	}
+	return scale
+}
+
 type guiWriter struct {
-	mu    sync.Mutex
-	entry *widget.Entry
+	mu     sync.Mutex
+	grid   *widget.TextGrid
+	buffer string
+}
+
+func newGUIWriter(grid *widget.TextGrid) *guiWriter {
+	return &guiWriter{grid: grid}
 }
 
 func (w *guiWriter) Write(data []byte) (int, error) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
-	text := string(data)
-	fyne.Do(func() {
-		const maxLogBytes = 64 << 10
-		current := w.entry.Text + text
-		if len(current) > maxLogBytes {
-			current = current[len(current)-maxLogBytes:]
-		}
-		w.entry.SetText(current)
-		w.entry.CursorRow = len(strings.Split(current, "\n")) - 1
-		w.entry.Refresh()
-	})
+	w.buffer += string(data)
+	w.trimLocked()
+	current := w.buffer
+	w.mu.Unlock()
+	w.render(current)
 	return len(data), nil
+}
+
+func (w *guiWriter) Reset() {
+	w.mu.Lock()
+	w.buffer = ""
+	w.mu.Unlock()
+	w.render("")
+}
+
+func (w *guiWriter) trimLocked() {
+	const maxLogBytes = 64 << 10
+	if len(w.buffer) <= maxLogBytes {
+		return
+	}
+	w.buffer = w.buffer[len(w.buffer)-maxLogBytes:]
+	if newline := strings.IndexByte(w.buffer, '\n'); newline >= 0 {
+		w.buffer = w.buffer[newline+1:]
+	}
+}
+
+func (w *guiWriter) render(text string) {
+	fyne.Do(func() {
+		w.grid.SetText(text)
+		style := &widget.CustomTextGridStyle{
+			FGColor: logForegroundColor,
+			BGColor: logBackgroundColor,
+		}
+		for row := range w.grid.Rows {
+			w.grid.SetRowStyle(row, style)
+		}
+		w.grid.ScrollToBottom()
+	})
 }

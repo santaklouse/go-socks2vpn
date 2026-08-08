@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.graphics.Typeface
 import android.net.VpnService
 import android.os.Build
@@ -18,6 +19,7 @@ import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
@@ -30,14 +32,35 @@ class MainActivity : Activity() {
     private lateinit var usernameInput: EditText
     private lateinit var passwordInput: EditText
     private lateinit var statusView: TextView
+	private lateinit var connectionIndicator: TextView
+	private lateinit var trafficTotalsView: TextView
+	private lateinit var downloadSpeedView: TextView
+	private lateinit var uploadSpeedView: TextView
+	private lateinit var downloadMeter: ProgressBar
+	private lateinit var uploadMeter: ProgressBar
     private lateinit var connectButton: Button
     private lateinit var disconnectButton: Button
     private var pending: ProxyInput? = null
+	private var importedConfiguration = false
 
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+			if (intent?.action == TunnelVpnService.ACTION_STATISTICS) {
+				updateStatistics(
+					intent.getLongExtra(TunnelVpnService.EXTRA_DOWNLOADED_BYTES, 0),
+					intent.getLongExtra(TunnelVpnService.EXTRA_UPLOADED_BYTES, 0),
+					intent.getLongExtra(TunnelVpnService.EXTRA_DOWNLOAD_RATE, 0),
+					intent.getLongExtra(TunnelVpnService.EXTRA_UPLOAD_RATE, 0),
+				)
+				return
+			}
             val connected = intent?.getBooleanExtra(TunnelVpnService.EXTRA_CONNECTED, false) ?: false
             val message = intent?.getStringExtra(TunnelVpnService.EXTRA_MESSAGE) ?: "Disconnected"
+			if (!connected && message == "Disconnected" && importedConfiguration) return
+			if (connected && importedConfiguration) {
+				updateStatus(true, "Connected; imported configuration will be used after reconnecting.")
+				return
+			}
             updateStatus(connected, message)
         }
     }
@@ -48,6 +71,7 @@ class MainActivity : Activity() {
         restoreFields()
         applyDeepLink(intent)
         registerStatusReceiver()
+		queryTunnelState()
         requestNotificationPermission()
     }
 
@@ -60,6 +84,7 @@ class MainActivity : Activity() {
         super.onNewIntent(intent)
         setIntent(intent)
         applyDeepLink(intent)
+		queryTunnelState()
     }
 
     @Deprecated("VpnService.prepare still uses the activity-result contract")
@@ -118,6 +143,7 @@ class MainActivity : Activity() {
             text = "Disconnect"
             isEnabled = false
             setOnClickListener {
+				updateStatus(true, "Disconnecting…")
                 startService(Intent(this@MainActivity, TunnelVpnService::class.java).apply {
                     action = TunnelVpnService.ACTION_STOP
                 })
@@ -129,14 +155,55 @@ class MainActivity : Activity() {
             addView(disconnectButton, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         })
 
+		connectionIndicator = TextView(this).apply {
+			text = "●"
+			textSize = 22f
+			setTextColor(DISCONNECTED_COLOR)
+			gravity = Gravity.CENTER_VERTICAL
+			setPadding(0, 0, (8 * density).toInt(), 0)
+		}
         statusView = TextView(this).apply {
             text = "Disconnected"
             textSize = 17f
-            gravity = Gravity.CENTER_HORIZONTAL
+			gravity = Gravity.CENTER_VERTICAL
             setTypeface(typeface, Typeface.BOLD)
-            setPadding(0, (18 * density).toInt(), 0, (10 * density).toInt())
         }
-        root.addView(statusView)
+		root.addView(LinearLayout(this).apply {
+			orientation = LinearLayout.HORIZONTAL
+			gravity = Gravity.CENTER
+			setPadding(0, (18 * density).toInt(), 0, (10 * density).toInt())
+			addView(connectionIndicator)
+			addView(statusView)
+		})
+
+		trafficTotalsView = TextView(this).apply {
+			textSize = 15f
+			gravity = Gravity.CENTER_HORIZONTAL
+		}
+		downloadSpeedView = TextView(this).apply { gravity = Gravity.CENTER_HORIZONTAL }
+		uploadSpeedView = TextView(this).apply { gravity = Gravity.CENTER_HORIZONTAL }
+		downloadMeter = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = METER_STEPS }
+		uploadMeter = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = METER_STEPS }
+		root.addView(trafficTotalsView)
+		root.addView(TextView(this).apply {
+			text = "Current speed"
+			setTypeface(typeface, Typeface.BOLD)
+			setPadding(0, (8 * density).toInt(), 0, 0)
+		})
+		root.addView(LinearLayout(this).apply {
+			orientation = LinearLayout.HORIZONTAL
+			addView(LinearLayout(this@MainActivity).apply {
+				orientation = LinearLayout.VERTICAL
+				addView(downloadSpeedView)
+				addView(downloadMeter, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (8 * density).toInt()))
+			}, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+			addView(LinearLayout(this@MainActivity).apply {
+				orientation = LinearLayout.VERTICAL
+				addView(uploadSpeedView)
+				addView(uploadMeter, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (8 * density).toInt()))
+			}, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+		})
+		updateStatistics(0, 0, 0, 0)
         root.addView(TextView(this).apply {
             text = "Android will show a system prompt to create the VPN. The password is kept in memory only until disconnection."
             textSize = 14f
@@ -166,6 +233,7 @@ class MainActivity : Activity() {
         portInput.setText(imported.port.toString())
         usernameInput.setText(imported.username)
         passwordInput.setText(imported.password)
+		importedConfiguration = true
         updateStatus(false, "Configuration imported from link. Review it and tap Connect.")
     }
 
@@ -183,6 +251,8 @@ class MainActivity : Activity() {
     }
 
     private fun startTunnel(configuration: ProxyInput) {
+		importedConfiguration = false
+		updateStatistics(0, 0, 0, 0)
 		updateStatus(true, "Connecting…")
         val intent = Intent(this, TunnelVpnService::class.java).apply {
             action = TunnelVpnService.ACTION_START
@@ -217,9 +287,43 @@ class MainActivity : Activity() {
 
     private fun updateStatus(connected: Boolean, message: String) {
         statusView.text = message
+		connectionIndicator.setTextColor(
+			when {
+				!connected -> DISCONNECTED_COLOR
+				message.startsWith("Connecting") || message.startsWith("Disconnecting") -> CONNECTING_COLOR
+				else -> CONNECTED_COLOR
+			},
+		)
         connectButton.isEnabled = !connected
         disconnectButton.isEnabled = connected
     }
+
+	private fun updateStatistics(downloaded: Long, uploaded: Long, downloadRate: Long, uploadRate: Long) {
+		trafficTotalsView.text = "Session traffic: ↓ Download ${formatBytes(downloaded)}    ↑ Upload ${formatBytes(uploaded)}"
+		downloadSpeedView.text = "↓ ${formatBytes(downloadRate)}/s"
+		uploadSpeedView.text = "↑ ${formatBytes(uploadRate)}/s"
+		val scale = speedMeterScale(maxOf(downloadRate, uploadRate))
+		downloadMeter.progress = ((downloadRate.coerceAtLeast(0).toDouble() / scale) * METER_STEPS).toInt().coerceIn(0, METER_STEPS)
+		uploadMeter.progress = ((uploadRate.coerceAtLeast(0).toDouble() / scale) * METER_STEPS).toInt().coerceIn(0, METER_STEPS)
+	}
+
+	private fun formatBytes(value: Long): String {
+		val safe = value.coerceAtLeast(0)
+		if (safe < 1024) return "$safe B"
+		var divisor = 1024.0
+		var unit = 0
+		while (safe / divisor >= 1024 && unit < 4) {
+			divisor *= 1024
+			unit++
+		}
+		return String.format(java.util.Locale.US, "%.1f %ciB", safe / divisor, "KMGTPE"[unit])
+	}
+
+	private fun speedMeterScale(value: Long): Double {
+		var scale = 1024.0
+		while (scale < value.coerceAtLeast(0) && scale < Long.MAX_VALUE / 8.0) scale *= 8
+		return scale
+	}
 
     private fun saveNonSecretFields(input: ProxyInput) {
         getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit()
@@ -239,7 +343,10 @@ class MainActivity : Activity() {
     }
 
     private fun registerStatusReceiver() {
-        val filter = IntentFilter(TunnelVpnService.ACTION_STATUS)
+		val filter = IntentFilter().apply {
+			addAction(TunnelVpnService.ACTION_STATUS)
+			addAction(TunnelVpnService.ACTION_STATISTICS)
+		}
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(statusReceiver, filter, RECEIVER_NOT_EXPORTED)
         } else {
@@ -247,6 +354,12 @@ class MainActivity : Activity() {
             registerReceiver(statusReceiver, filter)
         }
     }
+
+	private fun queryTunnelState() {
+		startService(Intent(this, TunnelVpnService::class.java).apply {
+			action = TunnelVpnService.ACTION_QUERY
+		})
+	}
 
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -268,5 +381,9 @@ class MainActivity : Activity() {
         private const val VPN_PERMISSION_REQUEST = 100
         private const val NOTIFICATION_PERMISSION_REQUEST = 101
         private const val PREFERENCES = "proxy"
+		private const val METER_STEPS = 1000
+		private val DISCONNECTED_COLOR = Color.rgb(217, 50, 50)
+		private val CONNECTING_COLOR = Color.rgb(240, 162, 2)
+		private val CONNECTED_COLOR = Color.rgb(32, 177, 90)
     }
 }

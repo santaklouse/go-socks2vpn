@@ -60,6 +60,14 @@ sudo ./bin/socks2vpn --proxy '[2001:db8::10]:1080:alice:correct-horse-battery-st
 sudo ./bin/socks2vpn --proxy 'socks4://192.168.192.100:9050'
 ```
 
+Add `--stats` to print session download/upload totals and current transfer rates once per second:
+
+```bash
+sudo ./bin/socks2vpn --stats --proxy 'socks5://alice:correct-horse-battery-staple@192.0.2.10:1080'
+```
+
+The counters measure IP bytes carried through the TUN session. `download` is traffic delivered from the VPN to applications; `upload` is traffic sent by applications into the VPN. SOCKS framing and transport overhead outside the TUN are not included.
+
 Preview the plan without downloading files or changing the network:
 
 ```bash
@@ -111,6 +119,8 @@ sudo ./bin/socks2vpn-gui
 
 On Windows, launch `socks2vpn-gui.exe` with **Run as administrator**. On Linux, use `sudo -E`; on macOS, use `sudo` from Terminal. The GUI checks privileges before initializing the VPN. Without root or Administrator privileges, the main window does not open; instead, the application displays a modal alert with the correct launch command and exits when the alert is closed. The GUI saves the server, port, and username, but never the password.
 
+The desktop GUI always displays a connection lamp: red means disconnected or failed, amber means connecting or disconnecting, and green means connected. Session download/upload totals and two live speed meters are enabled by default. The log viewer uses a fixed dark background with high-contrast light text on every system theme.
+
 ## Configuration links
 
 The desktop and Android applications accept both the canonical `socks2vpn://` scheme and the compatible `socks2vps://` alias. Opening a link fills the form but never connects automatically:
@@ -157,7 +167,7 @@ cd android
 
 The Gradle script builds the shared Go engine into `app/libs/tun2socks.aar` through `gomobile`; this is a library inside the APK, not a separate process. The resulting APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-The Android application supports IPv4 and IPv6, configures DNS `1.1.1.1`, performs a TCP proxy preflight, and runs as a foreground VPN service. The password remains in process memory only until disconnection.
+The Android application supports IPv4 and IPv6, configures DNS `1.1.1.1`, performs a TCP proxy preflight, and runs as a foreground VPN service. Its GUI includes the same connection lamp, session traffic totals, and live download/upload meters. The password remains in process memory only until disconnection.
 
 ## Docker
 
