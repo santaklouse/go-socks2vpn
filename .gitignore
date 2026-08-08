@@ -14,3 +14,4 @@ android/app/libs/*.aar
 android/enginebridge/*.aar
 desktop-gui/build/
 desktop-gui/vendor/
+/.idea
