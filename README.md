@@ -74,6 +74,32 @@ sudo ./bin/socks2vpn --proxy 'socks4://192.168.192.100:9050'
 
 ## Desktop GUI
 
+Установка последнего релиза одной командой на macOS и Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/santaklouse/go-socks2vpn/main/scripts/install-gui.sh | sh
+```
+
+Установщик определяет ОС и архитектуру, скачивает подходящий GUI-архив, проверяет его по `SHA256SUMS` и устанавливает бинарник в `/usr/local/bin`. В Linux он также устанавливает недостающие OpenGL, Wayland, XKB и X11 runtime-библиотеки через `apt`, `dnf`, `yum` или `pacman`.
+
+После установки запустите GUI с правами администратора:
+
+```bash
+sudo -E socks2vpn-gui
+```
+
+Установка в Windows из PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/santaklouse/go-socks2vpn/main/scripts/install-gui.ps1 | iex
+```
+
+Windows-установщик проверяет SHA-256, устанавливает программу в `%LOCALAPPDATA%\Programs\go-socks2vpn`, добавляет её в пользовательский `PATH` и создаёт ярлык `go-socks2vpn` в меню «Пуск». Ярлык автоматически показывает стандартный UAC-запрос. Windows ARM64 использует amd64-сборку через системную x64-эмуляцию.
+
+Поддерживаются готовые GUI-релизы для macOS amd64/arm64, Linux amd64 и Windows amd64. Для установки конкретной версии на macOS или Linux задайте, например, `GO_SOCKS2VPN_VERSION=v1.0.0`; в Windows скачайте скрипт и запустите его с параметром `-Version v1.0.0`.
+
+Ручная сборка из исходного кода:
+
 ```bash
 make gui
 sudo ./bin/socks2vpn-gui

@@ -30,6 +30,8 @@ jobs:
         run: go test -race ./...
       - name: Go vet
         run: go vet ./...
+      - name: Validate Unix GUI installer
+        run: sh -n scripts/install-gui.sh
       - name: Install Linux GUI libraries
         run: >-
           sudo apt-get update && sudo apt-get install -y
@@ -108,6 +110,21 @@ jobs:
           cache-dependency-path: |
             go.sum
             desktop-gui/go.sum
+      - name: Validate PowerShell GUI installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "scripts/install-gui.ps1"),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
       - name: Install Linux GUI libraries
         if: runner.os == 'Linux'
         run: >-
