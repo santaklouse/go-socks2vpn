@@ -31,7 +31,10 @@ jobs:
       - name: Go vet
         run: go vet ./...
       - name: Validate Unix GUI installer
-        run: sh -n scripts/install-gui.sh
+        run: |
+          sh -n scripts/install-gui.sh
+          sh -n scripts/package-macos-gui.sh
+          sh -n packaging/linux/socks2vpn-url-handler
       - name: Install Linux GUI libraries
         run: >-
           sudo apt-get update && sudo apt-get install -y
@@ -137,9 +140,21 @@ jobs:
       - name: Build GUI
         run: go build -trimpath -ldflags "-s -w" -o "../${{ matrix.executable }}" .
         working-directory: desktop-gui
-      - name: Package tar.gz
-        if: matrix.archive == 'tar'
-        run: tar -czf "${{ matrix.asset }}" "${{ matrix.executable }}"
+      - name: Build macOS application bundle
+        if: matrix.platform == 'macos'
+        run: ./scripts/package-macos-gui.sh "${{ matrix.executable }}" go-socks2vpn.app
+      - name: Prepare Linux URL handler
+        if: matrix.platform == 'linux'
+        run: |
+          cp packaging/linux/socks2vpn-url-handler .
+          cp packaging/linux/go-socks2vpn-url.desktop .
+          chmod 0755 socks2vpn-url-handler
+      - name: Package macOS tar.gz
+        if: matrix.platform == 'macos'
+        run: tar -czf "${{ matrix.asset }}" "${{ matrix.executable }}" go-socks2vpn.app
+      - name: Package Linux tar.gz
+        if: matrix.platform == 'linux'
+        run: tar -czf "${{ matrix.asset }}" "${{ matrix.executable }}" socks2vpn-url-handler go-socks2vpn-url.desktop
       - name: Package ZIP
         if: matrix.archive == 'zip'
         shell: pwsh
@@ -171,6 +186,11 @@ jobs:
       - uses: android-actions/setup-android@v3
       - name: Install Android SDK and NDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+      - name: Android unit tests
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+        run: ./gradlew --no-daemon testDebugUnitTest
+        working-directory: android
       - name: Build installable debug APK
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         env:

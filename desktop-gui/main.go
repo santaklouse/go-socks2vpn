@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -16,11 +17,13 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/santaklouse/go-socks2vpn/client"
+	"github.com/santaklouse/go-socks2vpn/internal/deeplink"
 	"github.com/santaklouse/go-socks2vpn/internal/elevated"
 	proxyconfig "github.com/santaklouse/go-socks2vpn/internal/proxy"
 )
 
 func main() {
+	importedSettings, hasDeepLink, deepLinkErr := settingsFromArgs(os.Args[1:])
 	a := app.NewWithID("com.santaklouse.gosocks2vpn")
 	w := a.NewWindow("go-socks2vpn")
 	if !elevated.IsAdministrator() {
@@ -51,8 +54,21 @@ func main() {
 		}
 	}
 	protocol.OnChanged(protocol.Selected)
+	if deepLinkErr == nil && hasDeepLink {
+		protocol.SetSelected(strings.ToUpper(importedSettings.Scheme))
+		host.SetText(importedSettings.Host)
+		port.SetText(strconv.Itoa(importedSettings.Port))
+		username.SetText(importedSettings.Username)
+		password.SetText(importedSettings.Password)
+	}
 
-	status := widget.NewLabel("Disconnected")
+	initialStatus := "Disconnected"
+	if deepLinkErr != nil {
+		initialStatus = "Invalid configuration link: " + deepLinkErr.Error()
+	} else if hasDeepLink {
+		initialStatus = "Configuration imported from link. Review it and press Connect."
+	}
+	status := widget.NewLabel(initialStatus)
 	status.TextStyle = fyne.TextStyle{Bold: true}
 	logs := widget.NewMultiLineEntry()
 	logs.Disable()
@@ -159,6 +175,29 @@ func main() {
 		}()
 	})
 	w.ShowAndRun()
+}
+
+func settingsFromArgs(args []string) (proxyconfig.Settings, bool, error) {
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		if argument == "--deep-link" {
+			if index+1 >= len(args) {
+				return proxyconfig.Settings{}, true, fmt.Errorf("--deep-link requires a URL")
+			}
+			settings, err := deeplink.Parse(args[index+1])
+			return settings, true, err
+		}
+		if strings.HasPrefix(argument, "--deep-link=") {
+			settings, err := deeplink.Parse(strings.TrimPrefix(argument, "--deep-link="))
+			return settings, true, err
+		}
+		lower := strings.ToLower(argument)
+		if strings.HasPrefix(lower, deeplink.Scheme+"://") || strings.HasPrefix(lower, deeplink.LegacyScheme+"://") {
+			settings, err := deeplink.Parse(argument)
+			return settings, true, err
+		}
+	}
+	return proxyconfig.Settings{}, false, nil
 }
 
 func showPrivilegeAlert(a fyne.App, w fyne.Window, goos string) {

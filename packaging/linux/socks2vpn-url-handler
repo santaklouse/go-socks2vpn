@@ -1,0 +1,33 @@
+#!/bin/sh
+set -eu
+
+uri=${1:-}
+case "$uri" in
+    socks2vpn://*|socks2vps://*) ;;
+    *)
+        printf '%s\n' "Error: unsupported go-socks2vpn configuration link." >&2
+        exit 2
+        ;;
+esac
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+gui="$script_dir/socks2vpn-gui"
+if [ ! -x "$gui" ]; then
+    printf 'Error: GUI executable was not found: %s\n' "$gui" >&2
+    exit 1
+fi
+
+if [ "$(id -u)" -eq 0 ]; then
+    exec "$gui" --deep-link "$uri"
+fi
+if ! command -v pkexec >/dev/null 2>&1; then
+    printf '%s\n' "Error: pkexec is required to open VPN links with administrator privileges." >&2
+    exit 1
+fi
+
+exec pkexec env \
+    DISPLAY="${DISPLAY:-}" \
+    WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" \
+    XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-}" \
+    XAUTHORITY="${XAUTHORITY:-}" \
+    "$gui" --deep-link "$uri"

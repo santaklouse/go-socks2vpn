@@ -82,6 +82,89 @@ install_linux_dependencies() {
     fi
 }
 
+install_linux_url_dependencies() {
+    if command -v pkexec >/dev/null 2>&1 && command -v xdg-mime >/dev/null 2>&1; then
+        return
+    fi
+
+    say "Installing Linux URL-handler dependencies…"
+    if command -v apt-get >/dev/null 2>&1; then
+        run_as_admin apt-get update
+        run_as_admin env DEBIAN_FRONTEND=noninteractive apt-get install -y policykit-1 xdg-utils
+    elif command -v dnf >/dev/null 2>&1; then
+        run_as_admin dnf install -y polkit xdg-utils
+    elif command -v yum >/dev/null 2>&1; then
+        run_as_admin yum install -y polkit xdg-utils
+    elif command -v pacman >/dev/null 2>&1; then
+        run_as_admin pacman -S --needed --noconfirm polkit xdg-utils
+    else
+        fail "unsupported package manager; install pkexec and xdg-mime manually"
+    fi
+    require_command pkexec
+    require_command xdg-mime
+}
+
+install_system_file() {
+    source_path=$1
+    destination_path=$2
+    destination_dir=$(dirname "$destination_path")
+    if mkdir -p "$destination_dir" 2>/dev/null && [ -w "$destination_dir" ]; then
+        install -m 0755 "$source_path" "$destination_path"
+    else
+        run_as_admin mkdir -p "$destination_dir"
+        run_as_admin install -m 0755 "$source_path" "$destination_path"
+    fi
+}
+
+install_linux_url_handler() {
+    source_dir=$1
+    handler_source="$source_dir/socks2vpn-url-handler"
+    desktop_source="$source_dir/go-socks2vpn-url.desktop"
+    [ -f "$handler_source" ] || fail "release archive does not contain the Linux URL handler"
+    [ -f "$desktop_source" ] || fail "release archive does not contain the Linux desktop entry"
+
+    handler_path="$install_dir/socks2vpn-url-handler"
+    install_system_file "$handler_source" "$handler_path"
+
+    data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
+    applications_dir="$data_home/applications"
+    desktop_path="$applications_dir/go-socks2vpn-url.desktop"
+    mkdir -p "$applications_dir"
+    awk -v handler="$handler_path" '{gsub("@URL_HANDLER@", handler); print}' \
+        "$desktop_source" > "$temp_dir/go-socks2vpn-url.desktop.rendered"
+    install -m 0644 "$temp_dir/go-socks2vpn-url.desktop.rendered" "$desktop_path"
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "$applications_dir"
+    fi
+    xdg-mime default go-socks2vpn-url.desktop x-scheme-handler/socks2vpn
+    xdg-mime default go-socks2vpn-url.desktop x-scheme-handler/socks2vps
+    say "URL handlers registered: socks2vpn:// and socks2vps://"
+}
+
+install_macos_application() {
+    source_dir=$1
+    app_source="$source_dir/go-socks2vpn.app"
+    [ -d "$app_source" ] || fail "release archive does not contain go-socks2vpn.app"
+
+    app_dir=${GO_SOCKS2VPN_APP_DIR:-/Applications}
+    app_destination="$app_dir/go-socks2vpn.app"
+    if mkdir -p "$app_dir" 2>/dev/null && [ -w "$app_dir" ]; then
+        rm -rf "$app_destination"
+        cp -R "$app_source" "$app_destination"
+    else
+        run_as_admin mkdir -p "$app_dir"
+        run_as_admin rm -rf "$app_destination"
+        run_as_admin cp -R "$app_source" "$app_destination"
+    fi
+
+    lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+    if [ -x "$lsregister" ]; then
+        "$lsregister" -f "$app_destination"
+    fi
+    say "macOS application installed: $app_destination"
+    say "URL handlers registered: socks2vpn:// and socks2vps://"
+}
+
 require_command curl
 require_command tar
 require_command uname
@@ -152,13 +235,15 @@ chmod 0755 "$binary_path"
 
 if [ "$platform" = "linux" ]; then
     install_linux_dependencies "$binary_path"
+    install_linux_url_dependencies
 fi
 
-if mkdir -p "$install_dir" 2>/dev/null && [ -w "$install_dir" ]; then
-    install -m 0755 "$binary_path" "$install_dir/socks2vpn-gui"
+install_system_file "$binary_path" "$install_dir/socks2vpn-gui"
+
+if [ "$platform" = "linux" ]; then
+    install_linux_url_handler "$temp_dir"
 else
-    run_as_admin mkdir -p "$install_dir"
-    run_as_admin install -m 0755 "$binary_path" "$install_dir/socks2vpn-gui"
+    install_macos_application "$temp_dir"
 fi
 
 say "GUI installed: $install_dir/socks2vpn-gui"

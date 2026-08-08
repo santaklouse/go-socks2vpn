@@ -84,7 +84,7 @@ Install the latest release with one command on macOS or Linux:
 curl -fsSL https://raw.githubusercontent.com/santaklouse/go-socks2vpn/main/scripts/install-gui.sh | sh
 ```
 
-The installer detects the operating system and architecture, downloads the matching GUI archive, verifies it against `SHA256SUMS`, and installs the binary into `/usr/local/bin`. On Linux, it also installs missing OpenGL, Wayland, XKB, and X11 runtime libraries through `apt`, `dnf`, `yum`, or `pacman`.
+The installer detects the operating system and architecture, downloads the matching GUI archive, verifies it against `SHA256SUMS`, and installs the binary into `/usr/local/bin`. On macOS it also installs a URL-enabled `go-socks2vpn.app` bundle into `/Applications`. On Linux, it installs missing OpenGL, Wayland, XKB, X11, PolicyKit, and `xdg-utils` runtime dependencies and registers desktop URL handlers.
 
 After installation, run the GUI with administrator privileges:
 
@@ -98,7 +98,7 @@ Install on Windows from PowerShell:
 irm https://raw.githubusercontent.com/santaklouse/go-socks2vpn/main/scripts/install-gui.ps1 | iex
 ```
 
-The Windows installer verifies SHA-256, installs the program into `%LOCALAPPDATA%\Programs\go-socks2vpn`, adds it to the user `PATH`, and creates a `go-socks2vpn` Start menu shortcut. The shortcut automatically shows the standard UAC prompt. Windows ARM64 runs the amd64 build through the operating system's x64 emulation.
+The Windows installer verifies SHA-256, installs the program into `%LOCALAPPDATA%\Programs\go-socks2vpn`, adds it to the user `PATH`, creates a `go-socks2vpn` Start menu shortcut, and registers configuration-link handlers. The shortcut and links automatically show the standard UAC prompt. Windows ARM64 runs the amd64 build through the operating system's x64 emulation.
 
 Prebuilt GUI releases are available for macOS amd64/arm64, Linux amd64, and Windows amd64. To install a specific version on macOS or Linux, set, for example, `GO_SOCKS2VPN_VERSION=v1.0.0`. On Windows, download the script and run it with `-Version v1.0.0`.
 
@@ -110,6 +110,34 @@ sudo ./bin/socks2vpn-gui
 ```
 
 On Windows, launch `socks2vpn-gui.exe` with **Run as administrator**. On Linux, use `sudo -E`; on macOS, use `sudo` from Terminal. The GUI checks privileges before initializing the VPN. Without root or Administrator privileges, the main window does not open; instead, the application displays a modal alert with the correct launch command and exits when the alert is closed. The GUI saves the server, port, and username, but never the password.
+
+## Configuration links
+
+The desktop and Android applications accept both the canonical `socks2vpn://` scheme and the compatible `socks2vps://` alias. Opening a link fills the form but never connects automatically:
+
+```text
+socks2vpn://socks5-proxyuser:proxypass@proxyhost:1080
+socks2vpn://socks4-proxyuser@proxyhost:9050
+```
+
+The protocol prefix is required. Use `socks5` or `socks4` without a dash when the proxy has no username. Percent-encode reserved characters in credentials, for example `user%40example` and `p%40ss%3Aword`. The imported password remains in memory only, is never saved, and is not written to logs.
+
+Test a registered desktop handler after installing the GUI:
+
+```bash
+# macOS
+open 'socks2vpn://socks5-proxyuser:proxypass@proxyhost:1080'
+
+# Linux
+xdg-open 'socks2vpn://socks5-proxyuser:proxypass@proxyhost:1080'
+```
+
+```powershell
+# Windows
+Start-Process 'socks2vpn://socks5-proxyuser:proxypass@proxyhost:1080'
+```
+
+Links containing passwords can remain in browser or messenger history, the clipboard, and operating-system metadata. Prefer links without a password when they may pass through an untrusted application.
 
 ## Android
 

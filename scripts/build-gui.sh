@@ -14,3 +14,12 @@ fi
 cd "$project_dir/desktop-gui"
 "$go_bin" build -trimpath -o "$output_dir/socks2vpn-gui$extension" .
 echo "GUI binary: $output_dir/socks2vpn-gui$extension"
+
+if [[ "$($go_bin env GOOS)" == "darwin" ]]; then
+    "$project_dir/scripts/package-macos-gui.sh" \
+        "$output_dir/socks2vpn-gui" "$output_dir/go-socks2vpn.app"
+elif [[ "$($go_bin env GOOS)" == "linux" ]]; then
+    cp "$project_dir/packaging/linux/socks2vpn-url-handler" "$output_dir/"
+    cp "$project_dir/packaging/linux/go-socks2vpn-url.desktop" "$output_dir/"
+    chmod 0755 "$output_dir/socks2vpn-url-handler"
+fi

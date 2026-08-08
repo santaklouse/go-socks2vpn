@@ -46,6 +46,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         buildInterface()
         restoreFields()
+        applyDeepLink(intent)
         registerStatusReceiver()
         requestNotificationPermission()
     }
@@ -53,6 +54,12 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         unregisterReceiver(statusReceiver)
         super.onDestroy()
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        applyDeepLink(intent)
     }
 
     @Deprecated("VpnService.prepare still uses the activity-result contract")
@@ -145,6 +152,21 @@ class MainActivity : Activity() {
             field.isSingleLine = true
             parent.addView(field, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
+    }
+
+    private fun applyDeepLink(source: Intent?) {
+        val raw = source?.dataString ?: return
+        source.data = null
+        val imported = runCatching { ProxyDeepLink.parse(raw) }.getOrElse { error ->
+            Toast.makeText(this, error.message ?: "Invalid configuration link", Toast.LENGTH_LONG).show()
+            return
+        }
+        protocolInput.setSelection(if (imported.scheme == "socks4") 1 else 0)
+        hostInput.setText(imported.host.removePrefix("[").removeSuffix("]"))
+        portInput.setText(imported.port.toString())
+        usernameInput.setText(imported.username)
+        passwordInput.setText(imported.password)
+        updateStatus(false, "Configuration imported from link. Review it and tap Connect.")
     }
 
     private fun requestConnection() {

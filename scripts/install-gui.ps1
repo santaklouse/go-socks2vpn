@@ -87,15 +87,34 @@ try {
     $launcherPath = Join-Path $InstallDir "launch-socks2vpn-gui.ps1"
     $escapedExecutable = $installedExecutable.Replace("'", "''")
     Set-Content -LiteralPath $launcherPath -Encoding UTF8 -Value @"
+[CmdletBinding()]
+param([string]`$DeepLink)
+
 `$ErrorActionPreference = "Stop"
-Start-Process -FilePath '$escapedExecutable' -Verb RunAs
+if (`$DeepLink) {
+    Start-Process -FilePath '$escapedExecutable' -ArgumentList @("--deep-link", `$DeepLink) -Verb RunAs
+} else {
+    Start-Process -FilePath '$escapedExecutable' -Verb RunAs
+}
 "@
+
+    $powerShellPath = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+    $handlerCommand = "`"$powerShellPath`" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$launcherPath`" -DeepLink `"%1`""
+    foreach ($scheme in @("socks2vpn", "socks2vps")) {
+        $schemePath = "HKCU:\Software\Classes\$scheme"
+        New-Item -Path $schemePath -Force | Out-Null
+        Set-Item -Path $schemePath -Value "URL:go-socks2vpn configuration link"
+        New-ItemProperty -Path $schemePath -Name "URL Protocol" -Value "" -PropertyType String -Force | Out-Null
+        $commandPath = Join-Path $schemePath "shell\open\command"
+        New-Item -Path $commandPath -Force | Out-Null
+        Set-Item -Path $commandPath -Value $handlerCommand
+    }
 
     $programsDir = [Environment]::GetFolderPath("Programs")
     $shortcutPath = Join-Path $programsDir "go-socks2vpn.lnk"
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+    $shortcut.TargetPath = $powerShellPath
     $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$launcherPath`""
     $shortcut.WorkingDirectory = $InstallDir
     $shortcut.IconLocation = "$installedExecutable,0"
@@ -104,6 +123,7 @@ Start-Process -FilePath '$escapedExecutable' -Verb RunAs
 
     Write-Host "GUI installed: $installedExecutable"
     Write-Host "Start menu shortcut created: go-socks2vpn"
+    Write-Host "URL handlers registered: socks2vpn:// and socks2vps://"
     Write-Host "Windows will show the standard administrator privilege prompt at startup."
 } finally {
     Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue

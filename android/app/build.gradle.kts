@@ -75,4 +75,5 @@ android {
 
 dependencies {
     implementation(files("libs/tun2socks.aar"))
+    testImplementation("junit:junit:4.13.2")
 }

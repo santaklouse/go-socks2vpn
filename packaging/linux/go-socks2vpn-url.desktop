@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=go-socks2vpn URL Handler
+Comment=Import a SOCKS proxy configuration into go-socks2vpn
+NoDisplay=true
+Terminal=false
+Exec="@URL_HANDLER@" %u
+MimeType=x-scheme-handler/socks2vpn;x-scheme-handler/socks2vps;

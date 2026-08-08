@@ -84,7 +84,7 @@ sudo ./bin/socks2vpn --proxy 'socks4://192.168.192.100:9050'
 curl -fsSL https://raw.githubusercontent.com/santaklouse/go-socks2vpn/main/scripts/install-gui.sh | sh
 ```
 
-Установщик определяет ОС и архитектуру, скачивает подходящий GUI-архив, проверяет его по `SHA256SUMS` и устанавливает бинарник в `/usr/local/bin`. В Linux он также устанавливает недостающие OpenGL, Wayland, XKB и X11 runtime-библиотеки через `apt`, `dnf`, `yum` или `pacman`.
+Установщик определяет ОС и архитектуру, скачивает подходящий GUI-архив, проверяет его по `SHA256SUMS` и устанавливает бинарник в `/usr/local/bin`. На macOS он также устанавливает поддерживающий URL-схемы bundle `go-socks2vpn.app` в `/Applications`. В Linux он устанавливает недостающие OpenGL, Wayland, XKB, X11, PolicyKit и `xdg-utils` runtime-зависимости и регистрирует desktop URL handlers.
 
 После установки запустите GUI с правами администратора:
 
@@ -98,7 +98,7 @@ sudo -E socks2vpn-gui
 irm https://raw.githubusercontent.com/santaklouse/go-socks2vpn/main/scripts/install-gui.ps1 | iex
 ```
 
-Windows-установщик проверяет SHA-256, устанавливает программу в `%LOCALAPPDATA%\Programs\go-socks2vpn`, добавляет её в пользовательский `PATH` и создаёт ярлык `go-socks2vpn` в меню «Пуск». Ярлык автоматически показывает стандартный UAC-запрос. Windows ARM64 использует amd64-сборку через системную x64-эмуляцию.
+Windows-установщик проверяет SHA-256, устанавливает программу в `%LOCALAPPDATA%\Programs\go-socks2vpn`, добавляет её в пользовательский `PATH`, создаёт ярлык `go-socks2vpn` в меню «Пуск» и регистрирует handlers ссылок конфигурации. Ярлык и ссылки автоматически показывают стандартный UAC-запрос. Windows ARM64 использует amd64-сборку через системную x64-эмуляцию.
 
 Поддерживаются готовые GUI-релизы для macOS amd64/arm64, Linux amd64 и Windows amd64. Для установки конкретной версии на macOS или Linux задайте, например, `GO_SOCKS2VPN_VERSION=v1.0.0`; в Windows скачайте скрипт и запустите его с параметром `-Version v1.0.0`.
 
@@ -110,6 +110,34 @@ sudo ./bin/socks2vpn-gui
 ```
 
 На Windows запускайте `socks2vpn-gui.exe` через «Запуск от имени администратора». На Linux можно использовать `sudo -E`; на macOS — `sudo` из Terminal. GUI проверяет права до инициализации VPN: без root/Administrator основное окно не открывается, показывается модальный alert с правильной командой запуска, после его закрытия приложение завершается. GUI сохраняет сервер, порт и имя пользователя, но никогда не сохраняет пароль.
+
+## Ссылки конфигурации
+
+Desktop- и Android-приложения принимают основную схему `socks2vpn://` и совместимый alias `socks2vps://`. Открытие ссылки заполняет форму, но никогда не подключает VPN автоматически:
+
+```text
+socks2vpn://socks5-proxyuser:proxypass@proxyhost:1080
+socks2vpn://socks4-proxyuser@proxyhost:9050
+```
+
+Префикс протокола обязателен. Если у прокси нет имени пользователя, укажите `socks5` или `socks4` без дефиса. Зарезервированные символы в реквизитах нужно percent-encode, например `user%40example` и `p%40ss%3Aword`. Импортированный пароль остаётся только в памяти, никогда не сохраняется и не записывается в логи.
+
+Проверить зарегистрированный desktop handler после установки GUI:
+
+```bash
+# macOS
+open 'socks2vpn://socks5-proxyuser:proxypass@proxyhost:1080'
+
+# Linux
+xdg-open 'socks2vpn://socks5-proxyuser:proxypass@proxyhost:1080'
+```
+
+```powershell
+# Windows
+Start-Process 'socks2vpn://socks5-proxyuser:proxypass@proxyhost:1080'
+```
+
+Ссылки с паролями могут оставаться в истории браузера или мессенджера, буфере обмена и метаданных операционной системы. Если ссылка проходит через недоверенное приложение, лучше не включать в неё пароль.
 
 ## Android
 
