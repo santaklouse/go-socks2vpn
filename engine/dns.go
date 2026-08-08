@@ -23,6 +23,7 @@ import (
 
 const (
 	dnsPort           = 53
+	dnsTypeAAAA       = 28
 	dnsRequestTimeout = 10 * time.Second
 	maxDNSMessageSize = 64 << 10
 )
@@ -31,20 +32,22 @@ const (
 // endpoint over the configured SOCKS proxy. Address must be a numeric
 // host:port so resolving the resolver cannot recursively require DNS.
 type DNSOverHTTPSConfig struct {
-	URL     string
-	Address string
+	URL         string
+	Address     string
+	DisableIPv6 bool
 }
 
 type dnsOverHTTPSHandler struct {
-	next      adapter.TransportHandler
-	proxy     upstreamproxy.Proxy
-	url       string
-	address   netip.Addr
-	port      uint16
-	client    *http.Client
-	transport *http.Transport
-	ctx       context.Context
-	cancel    context.CancelFunc
+	next        adapter.TransportHandler
+	proxy       upstreamproxy.Proxy
+	url         string
+	address     netip.Addr
+	port        uint16
+	disableIPv6 bool
+	client      *http.Client
+	transport   *http.Transport
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 type discardTransportHandler struct{}
@@ -124,13 +127,14 @@ func newDNSOverHTTPSHandler(next adapter.TransportHandler, proxy upstreamproxy.P
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	handler := &dnsOverHTTPSHandler{
-		next:    next,
-		proxy:   proxy,
-		url:     endpoint.String(),
-		address: address.Unmap(),
-		port:    uint16(port),
-		ctx:     ctx,
-		cancel:  cancel,
+		next:        next,
+		proxy:       proxy,
+		url:         endpoint.String(),
+		address:     address.Unmap(),
+		port:        uint16(port),
+		disableIPv6: config.DisableIPv6,
+		ctx:         ctx,
+		cancel:      cancel,
 	}
 	handler.transport = &http.Transport{
 		DialContext:         handler.dialContext,
@@ -197,6 +201,17 @@ func (h *dnsOverHTTPSHandler) exchange(query []byte) ([]byte, error) {
 	if len(query) < 12 || len(query) > maxDNSMessageSize {
 		return nil, errors.New("invalid DNS query length")
 	}
+	if h.disableIPv6 {
+		questionTypes, questionEnd, err := parseDNSQuestions(query)
+		if err != nil {
+			return nil, err
+		}
+		for _, questionType := range questionTypes {
+			if questionType == dnsTypeAAAA {
+				return dnsNoDataResponse(query, questionEnd), nil
+			}
+		}
+	}
 	ctx, cancel := context.WithTimeout(h.ctx, dnsRequestTimeout)
 	defer cancel()
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, h.url, bytes.NewReader(query))
@@ -228,6 +243,58 @@ func (h *dnsOverHTTPSHandler) exchange(query []byte) ([]byte, error) {
 		return nil, errors.New("DNS-over-HTTPS response does not match the query")
 	}
 	return payload, nil
+}
+
+func parseDNSQuestions(message []byte) ([]uint16, int, error) {
+	if len(message) < 12 {
+		return nil, 0, errors.New("DNS message is shorter than its header")
+	}
+	questionCount := int(message[4])<<8 | int(message[5])
+	if questionCount == 0 || questionCount > 64 {
+		return nil, 0, errors.New("invalid DNS question count")
+	}
+	offset := 12
+	types := make([]uint16, 0, questionCount)
+	for range questionCount {
+		for {
+			if offset >= len(message) {
+				return nil, 0, errors.New("truncated DNS question name")
+			}
+			length := int(message[offset])
+			offset++
+			switch {
+			case length == 0:
+				// End of the uncompressed name.
+			case length&0xc0 == 0xc0:
+				if offset >= len(message) {
+					return nil, 0, errors.New("truncated DNS compression pointer")
+				}
+				offset++
+			case length&0xc0 != 0 || length > 63 || offset+length > len(message):
+				return nil, 0, errors.New("invalid DNS question name")
+			default:
+				offset += length
+				continue
+			}
+			break
+		}
+		if offset+4 > len(message) {
+			return nil, 0, errors.New("truncated DNS question")
+		}
+		types = append(types, uint16(message[offset])<<8|uint16(message[offset+1]))
+		offset += 4
+	}
+	return types, offset, nil
+}
+
+func dnsNoDataResponse(query []byte, questionEnd int) []byte {
+	response := append([]byte(nil), query[:questionEnd]...)
+	response[2] |= 0x80
+	response[3] &= 0xf0
+	response[6], response[7] = 0, 0
+	response[8], response[9] = 0, 0
+	response[10], response[11] = 0, 0
+	return response
 }
 
 func dnsFailureResponse(query []byte) []byte {

@@ -26,11 +26,14 @@ import (
 )
 
 type Config struct {
-	Device       string
-	Interface    string
-	ProxyURL     string
-	MTU          int
-	DNSOverHTTPS *DNSOverHTTPSConfig
+	Device         string
+	Interface      string
+	ProxyURL       string
+	MTU            int
+	DNSOverHTTPS   *DNSOverHTTPSConfig
+	RejectUDP      []uint16
+	LogWarnings    bool
+	WarningHandler func(string)
 }
 
 type Engine struct {
@@ -80,6 +83,9 @@ func (e *Engine) Start(config Config) (result error) {
 	if err != nil {
 		return err
 	}
+	if config.WarningHandler != nil {
+		proxy = newDiagnosticProxy(proxy, config.WarningHandler)
+	}
 	dialer.Reset()
 	if config.Interface != "" {
 		iface, err := net.InterfaceByName(config.Interface)
@@ -108,8 +114,14 @@ func (e *Engine) Start(config Config) (result error) {
 	}
 	// fdbased.Device now owns the descriptor and closes it in Device.Close.
 	ownsFD = false
+	linkEndpoint := stack.LinkEndpoint(dev)
+	var delayedEndpoint *delayedLinkEndpoint
+	if len(config.RejectUDP) != 0 {
+		delayedEndpoint = newDelayedLinkEndpoint(linkEndpoint)
+		linkEndpoint = delayedEndpoint
+	}
 	networkStack, err := core.CreateStack(&core.Config{
-		LinkEndpoint:     dev,
+		LinkEndpoint:     linkEndpoint,
 		TransportHandler: transportHandler,
 	})
 	if err != nil {
@@ -119,8 +131,16 @@ func (e *Engine) Start(config Config) (result error) {
 		dev.Close()
 		return fmt.Errorf("cannot create tun2socks network stack: %w", err)
 	}
+	if len(config.RejectUDP) != 0 {
+		installUDPRejectPolicy(networkStack, transportHandler, config.RejectUDP)
+		delayedEndpoint.Activate()
+	}
 
-	logger, err := upstreamlog.NewLeveled(upstreamlog.SilentLevel)
+	logLevel := upstreamlog.SilentLevel
+	if config.LogWarnings {
+		logLevel = upstreamlog.WarnLevel
+	}
+	logger, err := upstreamlog.NewLeveled(logLevel)
 	if err == nil {
 		upstreamlog.SetLogger(logger)
 	}

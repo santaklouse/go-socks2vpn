@@ -11,6 +11,7 @@ import android.net.Uri
 import android.net.VpnService
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import mobile.Mobile
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -21,6 +22,7 @@ class TunnelVpnService : VpnService() {
     private val executor = Executors.newSingleThreadScheduledExecutor()
     private val running = AtomicBoolean(false)
     private var statisticsTask: ScheduledFuture<*>? = null
+	private var lastEngineWarning = ""
 
     override fun onCreate() {
         super.onCreate()
@@ -78,8 +80,6 @@ class TunnelVpnService : VpnService() {
                 .setMtu(MTU)
                 .addAddress("198.18.0.1", 32)
                 .addRoute("0.0.0.0", 0)
-                .addAddress("fd00:198:18::1", 128)
-                .addRoute("::", 0)
                 .addDnsServer("1.1.1.1")
                 .addDisallowedApplication(packageName)
                 .setBlocking(false)
@@ -161,6 +161,7 @@ class TunnelVpnService : VpnService() {
 
 	private fun startStatistics() {
 		stopStatistics()
+		lastEngineWarning = ""
 		var previousDownloaded = Mobile.downloadedBytes()
 		var previousUploaded = Mobile.uploadedBytes()
 		var previousAt = SystemClock.elapsedRealtimeNanos()
@@ -170,6 +171,11 @@ class TunnelVpnService : VpnService() {
 			val now = SystemClock.elapsedRealtimeNanos()
 			val downloaded = Mobile.downloadedBytes()
 			val uploaded = Mobile.uploadedBytes()
+			val engineWarning = Mobile.lastWarning()
+			if (engineWarning.isNotEmpty() && engineWarning != lastEngineWarning) {
+				Log.w(LOG_TAG, engineWarning)
+				lastEngineWarning = engineWarning
+			}
 			val elapsedSeconds = (now - previousAt).coerceAtLeast(1).toDouble() / 1_000_000_000.0
 			val downloadRate = ((downloaded - previousDownloaded).coerceAtLeast(0) / elapsedSeconds).toLong()
 			val uploadRate = ((uploaded - previousUploaded).coerceAtLeast(0) / elapsedSeconds).toLong()
@@ -245,5 +251,6 @@ class TunnelVpnService : VpnService() {
         private const val CHANNEL_ID = "vpn"
         private const val NOTIFICATION_ID = 1001
         private const val MTU = 1500
+		private const val LOG_TAG = "go-socks2vpn"
     }
 }

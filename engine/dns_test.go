@@ -111,3 +111,50 @@ func TestDNSOverHTTPSConfigRequiresNumericAddress(t *testing.T) {
 		t.Fatal("hostname bootstrap address unexpectedly accepted")
 	}
 }
+
+func TestDNSOverHTTPSDisablesIPv6WithoutCallingProxy(t *testing.T) {
+	proxy := &directTestProxy{address: "127.0.0.1:1"}
+	handler, err := newDNSOverHTTPSHandler(
+		nopTransportHandler{},
+		proxy,
+		DNSOverHTTPSConfig{
+			URL:         "https://dns.example/dns-query",
+			Address:     "1.1.1.1:443",
+			DisableIPv6: true,
+		},
+		&tls.Config{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer handler.Close()
+
+	query := []byte{
+		0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01, 0x06, 'g', 'o', 'o',
+		'g', 'l', 'e', 0x03, 'c', 'o', 'm', 0x00, 0x00,
+		0x1c, 0x00, 0x01,
+		// An EDNS OPT record that must not remain after ARCOUNT is cleared.
+		0x00, 0x00, 0x29, 0x10, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00,
+	}
+	response, err := handler.exchange(query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response) != 28 {
+		t.Fatalf("response length = %d, want 28", len(response))
+	}
+	if response[0] != 0x12 || response[1] != 0x34 || response[2]&0x80 == 0 {
+		t.Fatalf("invalid DNS response header: %x", response[:12])
+	}
+	if response[6] != 0 || response[7] != 0 || response[10] != 0 || response[11] != 0 {
+		t.Fatalf("DNS NODATA counts were not cleared: %x", response[4:12])
+	}
+	proxy.mu.Lock()
+	called := proxy.last != nil
+	proxy.mu.Unlock()
+	if called {
+		t.Fatal("AAAA query unexpectedly reached the proxy")
+	}
+}

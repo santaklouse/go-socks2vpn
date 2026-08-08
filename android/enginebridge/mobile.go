@@ -13,8 +13,10 @@ import (
 )
 
 var (
-	mu      sync.Mutex
-	current *tunengine.Engine
+	mu          sync.Mutex
+	current     *tunengine.Engine
+	warningMu   sync.RWMutex
+	lastWarning string
 )
 
 // Start attaches tun2socks to a file descriptor created by Android VpnService.
@@ -28,20 +30,38 @@ func Start(fd int, proxyURL string, mtu int) error {
 	if fd < 0 {
 		return errors.New("invalid VPN file descriptor")
 	}
+	setWarning("")
 	instance := tunengine.New()
 	if err := instance.Start(tunengine.Config{
-		Device:   "fd://" + strconv.Itoa(fd),
-		ProxyURL: proxyURL,
-		MTU:      mtu,
+		Device:         "fd://" + strconv.Itoa(fd),
+		ProxyURL:       proxyURL,
+		MTU:            mtu,
+		RejectUDP:      []uint16{443},
+		LogWarnings:    true,
+		WarningHandler: setWarning,
 		DNSOverHTTPS: &tunengine.DNSOverHTTPSConfig{
-			URL:     "https://cloudflare-dns.com/dns-query",
-			Address: "1.1.1.1:443",
+			URL:         "https://cloudflare-dns.com/dns-query",
+			Address:     "1.1.1.1:443",
+			DisableIPv6: true,
 		},
 	}); err != nil {
 		return err
 	}
 	current = instance
 	return nil
+}
+
+// LastWarning returns the newest non-secret SOCKS transport diagnostic.
+func LastWarning() string {
+	warningMu.RLock()
+	defer warningMu.RUnlock()
+	return lastWarning
+}
+
+func setWarning(message string) {
+	warningMu.Lock()
+	lastWarning = message
+	warningMu.Unlock()
 }
 
 // CheckProxy performs an authenticated SOCKS handshake before Android installs
