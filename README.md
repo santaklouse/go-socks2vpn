@@ -74,6 +74,8 @@ Test the SOCKS handshake without root privileges or VPN creation:
 
 No separate `tun2socks` executable is downloaded or launched: the network stack is compiled directly into `socks2vpn`. On Windows, only the official native Wintun 0.14.1 component is downloaded on first launch. Pinned SHA-256 hashes verify both the archive and the architecture-specific DLL, including subsequent launches from the cache. Nothing is downloaded at runtime on macOS or Linux.
 
+Before installing full-tunnel routes, the client resolves the SOCKS endpoint and detects the interface currently used to reach it. The embedded engine binds its outbound proxy connections to that interface, keeping the SOCKS connection outside the TUN even when the proxy is reachable through a separate overlay, tunnel, or local network interface.
+
 ## Desktop GUI
 
 Install the latest release with one command on macOS or Linux:
@@ -220,5 +222,6 @@ For pushes and pull requests, the workflow builds an installable debug APK. For 
 ## Important limitations
 
 - The SOCKS server must support the protocols required by the application. SOCKS4 carries TCP only; use SOCKS5 with UDP ASSOCIATE for UDP and DNS through the proxy.
+- SOCKS does not carry ICMP. The userspace network stack may answer `ping` locally, so a sub-millisecond RTT and TTL 64 do not prove that packets reached the remote host. Verify the tunnel with TCP traffic such as `curl https://icanhazip.com`.
 - Desktop routes are changed globally and require elevated privileges. Do not forcibly terminate the process with `kill -9`, because it will not have a chance to roll back the changes. Rollback is automatic after a regular Ctrl+C.
 - Every platform uses the same embedded Go engine from the `engine` package. Android passes the file descriptor from `VpnService` through a thin `gomobile` wrapper.

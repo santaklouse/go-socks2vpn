@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -87,11 +88,30 @@ func Run(ctx context.Context, options Options) error {
 		logger.Printf("Primary gateway: %s", networkInfo.Gateway)
 	}
 
+	proxyAddress, err := resolveProxyAddress(ctx, proxySettings.Host)
+	if err != nil {
+		return err
+	}
+	proxyRoute, routeErr := network.DetectRoute(ctx, info.OS, proxyAddress.String(), runner)
+	if routeErr != nil {
+		if !options.DryRun {
+			return fmt.Errorf("could not determine the outbound route to the SOCKS proxy: %w", routeErr)
+		}
+		logger.Printf("Warning: %v", routeErr)
+		proxyRoute.Interface = networkInfo.Interface
+	}
+	if proxyRoute.Interface == "" {
+		return errors.New("could not determine the outbound interface for the SOCKS proxy")
+	}
+	resolvedProxySettings := proxySettings
+	resolvedProxySettings.Host = proxyAddress.String()
+	logger.Printf("SOCKS outbound route: endpoint=%s, interface=%s", net.JoinHostPort(proxyAddress.String(), fmt.Sprint(proxySettings.Port)), proxyRoute.Interface)
+
 	plan, err := network.BuildPlan(ctx, info.OS, networkInfo, options.DNS, runner)
 	if err != nil {
 		return err
 	}
-	logger.Printf("Embedded tun2socks: device=%s, proxy=%s, interface=%s", plan.Device, proxySettings.RedactedURL(), networkInfo.Interface)
+	logger.Printf("Embedded tun2socks: device=%s, proxy=%s, interface=%s", plan.Device, proxySettings.RedactedURL(), proxyRoute.Interface)
 
 	if options.DryRun {
 		logger.Printf("Network configuration plan:")
@@ -114,8 +134,8 @@ func Run(ctx context.Context, options Options) error {
 	embedded := tunengine.New()
 	if err := embedded.Start(tunengine.Config{
 		Device:    plan.Device,
-		Interface: networkInfo.Interface,
-		ProxyURL:  proxySettings.URL(),
+		Interface: proxyRoute.Interface,
+		ProxyURL:  resolvedProxySettings.URL(),
 		MTU:       1500,
 	}); err != nil {
 		rollbackWithTimeout(session)
@@ -141,6 +161,30 @@ func Run(ctx context.Context, options Options) error {
 	embedded.Stop()
 	logger.Printf("Network configuration restored")
 	return nil
+}
+
+func resolveProxyAddress(ctx context.Context, host string) (netip.Addr, error) {
+	if address, err := netip.ParseAddr(host); err == nil {
+		return address.Unmap(), nil
+	}
+	addresses, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+	if err != nil {
+		return netip.Addr{}, fmt.Errorf("could not resolve SOCKS proxy host %s: %w", host, err)
+	}
+	var ipv6 netip.Addr
+	for _, address := range addresses {
+		address = address.Unmap()
+		if address.Is4() {
+			return address, nil
+		}
+		if address.Is6() && !ipv6.IsValid() {
+			ipv6 = address
+		}
+	}
+	if ipv6.IsValid() {
+		return ipv6, nil
+	}
+	return netip.Addr{}, fmt.Errorf("SOCKS proxy host %s has no IP addresses", host)
 }
 
 func prepareNativeDependencies(ctx context.Context, options Options, info platform.Info, logger Logger) error {

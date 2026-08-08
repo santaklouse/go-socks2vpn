@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"strconv"
 	"strings"
 
@@ -42,6 +43,44 @@ func Detect(ctx context.Context, goos string, runner command.Runner) (Info, erro
 	}
 }
 
+// DetectRoute returns the interface and gateway the host currently uses to
+// reach destination. It must run before the full-tunnel routes are installed.
+func DetectRoute(ctx context.Context, goos, destination string, runner command.Runner) (Info, error) {
+	address, err := netip.ParseAddr(destination)
+	if err != nil {
+		return Info{}, fmt.Errorf("invalid route destination %q: %w", destination, err)
+	}
+	destination = address.String()
+
+	switch goos {
+	case "linux":
+		family := "-4"
+		if address.Is6() {
+			family = "-6"
+		}
+		out, err := runner.Output(ctx, command.C("ip", family, "route", "get", destination))
+		if err != nil {
+			return Info{}, fmt.Errorf("could not detect the Linux route to %s: %w", destination, err)
+		}
+		return parseLinuxDestinationRoute(string(out))
+	case "darwin":
+		out, err := runner.Output(ctx, command.C("route", "-n", "get", destination))
+		if err != nil {
+			return Info{}, fmt.Errorf("could not detect the macOS route to %s: %w", destination, err)
+		}
+		return parseDarwinRoute(string(out))
+	case "windows":
+		script := fmt.Sprintf(`$items=@(Find-NetRoute -RemoteIPAddress '%s'); $r=$items | Where-Object {$null -ne $_.DestinationPrefix -and $_.InterfaceAlias} | Select-Object -First 1; if ($null -eq $r) { exit 2 }; [Console]::OutputEncoding=[Text.Encoding]::UTF8; Write-Output $r.InterfaceAlias; Write-Output $r.NextHop`, destination)
+		out, err := runner.Output(ctx, command.C("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script))
+		if err != nil {
+			return Info{}, fmt.Errorf("could not detect the Windows route to %s: %w", destination, err)
+		}
+		return parseWindowsDestinationRoute(string(out))
+	default:
+		return Info{}, fmt.Errorf("route detection is not supported on %s", goos)
+	}
+}
+
 func parseLinuxRoutes(output string) (Info, error) {
 	var routes [][]string
 	bestMetric := int(^uint(0) >> 1)
@@ -66,6 +105,15 @@ func parseLinuxRoutes(output string) (Info, error) {
 	}
 	best.DefaultRoutes = routes
 	return best, nil
+}
+
+func parseLinuxDestinationRoute(output string) (Info, error) {
+	fields := strings.Fields(strings.TrimSpace(output))
+	info := Info{Interface: fieldAfter(fields, "dev"), Gateway: fieldAfter(fields, "via")}
+	if info.Interface == "" {
+		return Info{}, errors.New("Linux destination route has no network interface")
+	}
+	return info, nil
 }
 
 func parseDarwinRoute(output string) (Info, error) {
@@ -94,6 +142,18 @@ func parseWindowsRoute(output string) (Info, error) {
 		return Info{}, errors.New("PowerShell did not return an interface and gateway")
 	}
 	return Info{Interface: strings.TrimSpace(lines[0]), Gateway: strings.TrimSpace(lines[1])}, nil
+}
+
+func parseWindowsDestinationRoute(output string) (Info, error) {
+	lines := strings.Split(strings.ReplaceAll(strings.TrimSpace(output), "\r", ""), "\n")
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) == "" {
+		return Info{}, errors.New("PowerShell did not return an interface for the destination route")
+	}
+	info := Info{Interface: strings.TrimSpace(lines[0])}
+	if len(lines) > 1 {
+		info.Gateway = strings.TrimSpace(lines[1])
+	}
+	return info, nil
 }
 
 func fieldAfter(fields []string, key string) string {

@@ -48,6 +48,22 @@ func TestReadProxy(t *testing.T) {
 	}
 }
 
+func TestResolveProxyAddressLiteral(t *testing.T) {
+	for _, test := range []struct {
+		host string
+		want string
+	}{
+		{host: "192.168.192.100", want: "192.168.192.100"},
+		{host: "2001:db8::1", want: "2001:db8::1"},
+		{host: "::ffff:192.0.2.10", want: "192.0.2.10"},
+	} {
+		got, err := resolveProxyAddress(context.Background(), test.host)
+		if err != nil || got.String() != test.want {
+			t.Fatalf("resolveProxyAddress(%q) = %q, %v; want %q", test.host, got, err, test.want)
+		}
+	}
+}
+
 type stringReader string
 
 func (s stringReader) Read(p []byte) (int, error) {
