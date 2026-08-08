@@ -37,7 +37,7 @@ class MainActivity : Activity() {
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val connected = intent?.getBooleanExtra(TunnelVpnService.EXTRA_CONNECTED, false) ?: false
-            val message = intent?.getStringExtra(TunnelVpnService.EXTRA_MESSAGE) ?: "Отключено"
+            val message = intent?.getStringExtra(TunnelVpnService.EXTRA_MESSAGE) ?: "Disconnected"
             updateStatus(connected, message)
         }
     }
@@ -64,7 +64,7 @@ class MainActivity : Activity() {
         if (resultCode == RESULT_OK && configuration != null) {
             startTunnel(configuration)
         } else {
-            updateStatus(false, "Разрешение VPN не предоставлено")
+            updateStatus(false, "VPN permission was not granted")
         }
     }
 
@@ -77,13 +77,13 @@ class MainActivity : Activity() {
         }
 
         root.addView(TextView(this).apply {
-            text = "SOCKS4/SOCKS5 → системный VPN"
+            text = "SOCKS4/SOCKS5 → system VPN"
             textSize = 22f
             setTypeface(typeface, Typeface.BOLD)
             setPadding(0, 0, 0, (16 * density).toInt())
         })
 
-        root.addView(TextView(this).apply { text = "Протокол" })
+        root.addView(TextView(this).apply { text = "Protocol" })
         protocolInput = Spinner(this).apply {
             adapter = ArrayAdapter(
                 this@MainActivity,
@@ -93,22 +93,22 @@ class MainActivity : Activity() {
         }
         root.addView(protocolInput, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
-        hostInput = addField(root, "Сервер", "proxy.example.com или 2001:db8::1")
-        portInput = addField(root, "Порт", "1080", InputType.TYPE_CLASS_NUMBER)
-        usernameInput = addField(root, "Пользователь", "необязательно")
+        hostInput = addField(root, "Server", "proxy.example.com or 2001:db8::1")
+        portInput = addField(root, "Port", "1080", InputType.TYPE_CLASS_NUMBER)
+        usernameInput = addField(root, "Username", "optional")
         passwordInput = addField(
             root,
-            "Пароль",
-            "не сохраняется",
+            "Password",
+            "not saved",
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD,
         )
 
         connectButton = Button(this).apply {
-            text = "Подключить"
+            text = "Connect"
             setOnClickListener { requestConnection() }
         }
         disconnectButton = Button(this).apply {
-            text = "Отключить"
+            text = "Disconnect"
             isEnabled = false
             setOnClickListener {
                 startService(Intent(this@MainActivity, TunnelVpnService::class.java).apply {
@@ -123,7 +123,7 @@ class MainActivity : Activity() {
         })
 
         statusView = TextView(this).apply {
-            text = "Отключено"
+            text = "Disconnected"
             textSize = 17f
             gravity = Gravity.CENTER_HORIZONTAL
             setTypeface(typeface, Typeface.BOLD)
@@ -131,7 +131,7 @@ class MainActivity : Activity() {
         }
         root.addView(statusView)
         root.addView(TextView(this).apply {
-            text = "Android покажет системный запрос на создание VPN. Пароль хранится только в памяти до отключения."
+            text = "Android will show a system prompt to create the VPN. The password is kept in memory only until disconnection."
             textSize = 14f
         })
         setContentView(ScrollView(this).apply { addView(root) })
@@ -161,7 +161,7 @@ class MainActivity : Activity() {
     }
 
     private fun startTunnel(configuration: ProxyInput) {
-		updateStatus(true, "Подключение…")
+		updateStatus(true, "Connecting…")
         val intent = Intent(this, TunnelVpnService::class.java).apply {
             action = TunnelVpnService.ACTION_START
             putExtra(TunnelVpnService.EXTRA_HOST, configuration.host)
@@ -180,10 +180,10 @@ class MainActivity : Activity() {
         val username = usernameInput.text.toString()
         val password = passwordInput.text.toString()
         val error = when {
-            host.isEmpty() || host.any { it.isWhitespace() || it == '/' || it == '\\' } -> "Укажите корректный адрес сервера"
-            port == null || port !in 1..65535 -> "Порт должен быть числом от 1 до 65535"
-            username.isEmpty() && password.isNotEmpty() -> "Пароль задан без пользователя"
-            scheme == "socks4" && password.isNotEmpty() -> "SOCKS4 поддерживает user ID, но не пароль"
+            host.isEmpty() || host.any { it.isWhitespace() || it == '/' || it == '\\' } -> "Enter a valid server address"
+            port == null || port !in 1..65535 -> "Port must be a number from 1 to 65535"
+            username.isEmpty() && password.isNotEmpty() -> "A password was provided without a username"
+            scheme == "socks4" && password.isNotEmpty() -> "SOCKS4 supports a user ID but not a password"
             else -> null
         }
         if (error != null) {

@@ -21,17 +21,17 @@ func main() {
 }
 
 func run() int {
-	proxy := flag.String("proxy", "", "SOCKS-прокси: socks4://, socks5:// или host:port[:user:password]")
-	cacheDir := flag.String("cache-dir", "", "каталог для Wintun на Windows")
-	interfaceName := flag.String("interface", "", "основной сетевой интерфейс (обычно определяется автоматически)")
-	gateway := flag.String("gateway", "", "основной IPv4-шлюз (обычно определяется автоматически)")
-	dns := flag.String("dns", "8.8.8.8", "DNS-сервер для TUN-интерфейса Windows")
-	dryRun := flag.Bool("dry-run", false, "показать план без изменения сети и загрузок")
-	checkProxy := flag.Bool("check-proxy", false, "проверить TCP handshake прокси без создания VPN")
-	checkTarget := flag.String("check-target", "1.1.1.1:443", "TCP-адрес для --check-proxy")
-	showVersion := flag.Bool("version", false, "показать версию")
+	proxy := flag.String("proxy", "", "SOCKS proxy: socks4://, socks5://, or host:port[:user:password]")
+	cacheDir := flag.String("cache-dir", "", "directory for Wintun on Windows")
+	interfaceName := flag.String("interface", "", "primary network interface (usually detected automatically)")
+	gateway := flag.String("gateway", "", "primary IPv4 gateway (usually detected automatically)")
+	dns := flag.String("dns", "8.8.8.8", "DNS server for the Windows TUN interface")
+	dryRun := flag.Bool("dry-run", false, "show the plan without changing the network or downloading files")
+	checkProxy := flag.Bool("check-proxy", false, "test the proxy TCP handshake without creating a VPN")
+	checkTarget := flag.String("check-target", "1.1.1.1:443", "TCP address used by --check-proxy")
+	showVersion := flag.Bool("version", false, "show the version")
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Использование: %s [параметры]\n\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [options]\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -41,13 +41,13 @@ func run() int {
 		return 0
 	}
 	fmt.Println("=============================================")
-	fmt.Println("  go-socks2vpn — SOCKS4/SOCKS5 как системный VPN")
+	fmt.Println("  go-socks2vpn — SOCKS4/SOCKS5 as a system VPN")
 	fmt.Println("=============================================")
 	if *proxy == "" {
 		var err error
 		*proxy, err = client.ReadProxy(os.Stdin, os.Stdout)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Ошибка:", err)
+			fmt.Fprintln(os.Stderr, "Error:", err)
 			return 2
 		}
 	}
@@ -55,10 +55,10 @@ func run() int {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err := tunengine.CheckProxy(ctx, *proxy, *checkTarget); err != nil {
-			fmt.Fprintln(os.Stderr, "Ошибка проверки прокси:", err)
+			fmt.Fprintln(os.Stderr, "Proxy check failed:", err)
 			return 1
 		}
-		fmt.Printf("Прокси работает: TCP handshake к %s выполнен успешно\n", *checkTarget)
+		fmt.Printf("Proxy is working: TCP handshake to %s succeeded\n", *checkTarget)
 		return 0
 	}
 
@@ -75,7 +75,7 @@ func run() int {
 		Log:       logger,
 	})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Ошибка:", err)
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		return 1
 	}
 	return 0

@@ -49,19 +49,19 @@ func Run(ctx context.Context, options Options) error {
 	}
 	info := platform.Detect()
 	if info.OS != "darwin" && info.OS != "linux" && info.OS != "windows" {
-		return fmt.Errorf("desktop-клиент не поддерживает %s; на Android используйте приложение из каталога android", info.OS)
+		return fmt.Errorf("the desktop client does not support %s; on Android, use the application from the android directory", info.OS)
 	}
-	logger.Printf("Платформа: %s", info.Description())
-	logger.Printf("SOCKS-прокси: %s", proxySettings.RedactedURL())
+	logger.Printf("Platform: %s", info.Description())
+	logger.Printf("SOCKS proxy: %s", proxySettings.RedactedURL())
 	if proxySettings.Scheme == proxyconfig.SchemeSOCKS4 {
-		logger.Printf("Предупреждение: SOCKS4 передаёт только TCP к IPv4; UDP, DNS и IPv6 назначения не поддерживаются")
+		logger.Printf("Warning: SOCKS4 only carries TCP to IPv4 destinations; UDP, DNS, and IPv6 destinations are not supported")
 	}
 
 	if !options.DryRun && !elevated.IsAdministrator() {
 		if info.OS == "windows" {
-			return errors.New("для настройки VPN запустите программу от имени администратора")
+			return errors.New("run the application as administrator to configure the VPN")
 		}
-		return errors.New("для настройки VPN запустите программу через sudo")
+		return errors.New("run the application with sudo to configure the VPN")
 	}
 
 	runner := command.ExecRunner{}
@@ -70,7 +70,7 @@ func Run(ctx context.Context, options Options) error {
 		if !options.DryRun && options.Interface == "" {
 			return detectErr
 		}
-		logger.Printf("Предупреждение: %v", detectErr)
+		logger.Printf("Warning: %v", detectErr)
 		networkInfo = fallbackNetwork(info.OS)
 	}
 	if options.Interface != "" {
@@ -80,21 +80,21 @@ func Run(ctx context.Context, options Options) error {
 		networkInfo.Gateway = options.Gateway
 	}
 	if networkInfo.Interface == "" {
-		return errors.New("не удалось определить основной сетевой интерфейс; укажите --interface")
+		return errors.New("could not detect the primary network interface; specify --interface")
 	}
-	logger.Printf("Основной интерфейс: %s", networkInfo.Interface)
+	logger.Printf("Primary interface: %s", networkInfo.Interface)
 	if networkInfo.Gateway != "" {
-		logger.Printf("Основной шлюз: %s", networkInfo.Gateway)
+		logger.Printf("Primary gateway: %s", networkInfo.Gateway)
 	}
 
 	plan, err := network.BuildPlan(ctx, info.OS, networkInfo, options.DNS, runner)
 	if err != nil {
 		return err
 	}
-	logger.Printf("Встроенный tun2socks: device=%s, proxy=%s, interface=%s", plan.Device, proxySettings.RedactedURL(), networkInfo.Interface)
+	logger.Printf("Embedded tun2socks: device=%s, proxy=%s, interface=%s", plan.Device, proxySettings.RedactedURL(), networkInfo.Interface)
 
 	if options.DryRun {
-		logger.Printf("План настройки сети:")
+		logger.Printf("Network configuration plan:")
 		for _, step := range plan.Steps {
 			logger.Printf("  %s", step.Do.String())
 		}
@@ -119,7 +119,7 @@ func Run(ctx context.Context, options Options) error {
 		MTU:       1500,
 	}); err != nil {
 		rollbackWithTimeout(session)
-		return fmt.Errorf("не удалось запустить встроенный tun2socks: %w", err)
+		return fmt.Errorf("could not start the embedded tun2socks engine: %w", err)
 	}
 
 	if plan.Timing == network.AfterProcess {
@@ -133,13 +133,13 @@ func Run(ctx context.Context, options Options) error {
 		}
 	}
 
-	logger.Printf("VPN подключён. Для отключения нажмите Ctrl+C.")
+	logger.Printf("VPN connected. Press Ctrl+C to disconnect.")
 	<-ctx.Done()
-	logger.Printf("Получен сигнал отключения")
+	logger.Printf("Disconnect signal received")
 
 	rollbackWithTimeout(session)
 	embedded.Stop()
-	logger.Printf("Сетевая конфигурация восстановлена")
+	logger.Printf("Network configuration restored")
 	return nil
 }
 
@@ -170,10 +170,10 @@ type networkSession struct {
 
 func (s *networkSession) apply(ctx context.Context, plan network.Plan) error {
 	for _, step := range plan.Steps {
-		s.log.Printf("Настройка: %s", step.Do.String())
+		s.log.Printf("Applying: %s", step.Do.String())
 		if _, err := s.runner.Output(ctx, step.Do); err != nil {
 			rollbackWithTimeout(s)
-			return fmt.Errorf("не удалось настроить сеть: %w", err)
+			return fmt.Errorf("could not configure the network: %w", err)
 		}
 		s.applied = append(s.applied, step)
 	}
@@ -183,9 +183,9 @@ func (s *networkSession) apply(ctx context.Context, plan network.Plan) error {
 func (s *networkSession) rollback(ctx context.Context) {
 	for i := len(s.applied) - 1; i >= 0; i-- {
 		for _, undo := range s.applied[i].Undo {
-			s.log.Printf("Откат: %s", undo.String())
+			s.log.Printf("Rolling back: %s", undo.String())
 			if _, err := s.runner.Output(ctx, undo); err != nil {
-				s.log.Printf("Предупреждение при откате: %v", err)
+				s.log.Printf("Rollback warning: %v", err)
 			}
 		}
 	}
@@ -210,7 +210,7 @@ func waitForInterface(ctx context.Context, name string) error {
 		select {
 		case <-ticker.C:
 		case <-deadline.C:
-			return fmt.Errorf("TUN-интерфейс %s не появился за 12 секунд", name)
+			return fmt.Errorf("TUN interface %s did not appear within 12 seconds", name)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -230,14 +230,14 @@ func fallbackNetwork(goos string) network.Info {
 
 // ReadProxy reads one complete proxy specification from a CLI stream.
 func ReadProxy(reader io.Reader, writer io.Writer) (string, error) {
-	fmt.Fprintln(writer, "Введите SOCKS-прокси (socks4://host:port, socks5:// URL или host:port:user:password):")
+	fmt.Fprintln(writer, "Enter a SOCKS proxy (socks4://host:port, socks5:// URL, or host:port:user:password):")
 	line, err := bufio.NewReader(reader).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return "", err
 	}
 	line = strings.TrimSpace(line)
 	if line == "" {
-		return "", errors.New("прокси не указан")
+		return "", errors.New("proxy is not specified")
 	}
 	return line, nil
 }

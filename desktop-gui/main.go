@@ -33,15 +33,15 @@ func main() {
 	protocol := widget.NewSelect([]string{"SOCKS5", "SOCKS4"}, nil)
 	protocol.SetSelected(prefs.StringWithFallback("protocol", "SOCKS5"))
 	host := widget.NewEntry()
-	host.SetPlaceHolder("proxy.example.com или 2001:db8::1")
+	host.SetPlaceHolder("proxy.example.com or 2001:db8::1")
 	host.SetText(prefs.StringWithFallback("host", ""))
 	port := widget.NewEntry()
 	port.SetText(prefs.StringWithFallback("port", "1080"))
 	username := widget.NewEntry()
-	username.SetPlaceHolder("необязательно")
+	username.SetPlaceHolder("optional")
 	username.SetText(prefs.StringWithFallback("username", ""))
 	password := widget.NewPasswordEntry()
-	password.SetPlaceHolder("не сохраняется")
+	password.SetPlaceHolder("not saved")
 	protocol.OnChanged = func(value string) {
 		if value == "SOCKS4" {
 			password.SetText("")
@@ -52,7 +52,7 @@ func main() {
 	}
 	protocol.OnChanged(protocol.Selected)
 
-	status := widget.NewLabel("Отключено")
+	status := widget.NewLabel("Disconnected")
 	status.TextStyle = fyne.TextStyle{Bold: true}
 	logs := widget.NewMultiLineEntry()
 	logs.Disable()
@@ -76,7 +76,7 @@ func main() {
 	}
 	logger := log.New(&guiWriter{entry: logs}, "", log.LstdFlags)
 
-	disconnectButton = widget.NewButton("Отключить", func() {
+	disconnectButton = widget.NewButton("Disconnect", func() {
 		mu.Lock()
 		if cancel != nil {
 			cancel()
@@ -86,10 +86,10 @@ func main() {
 	disconnectButton.Importance = widget.DangerImportance
 	disconnectButton.Disable()
 
-	connectButton = widget.NewButton("Подключить", func() {
+	connectButton = widget.NewButton("Connect", func() {
 		proxyURL, err := makeProxyURL(protocol.Selected, host.Text, port.Text, username.Text, password.Text)
 		if err != nil {
-			setConnected(false, "Ошибка: "+err.Error())
+			setConnected(false, "Error: "+err.Error())
 			return
 		}
 		prefs.SetString("host", strings.TrimSpace(host.Text))
@@ -103,7 +103,7 @@ func main() {
 		cancel = stop
 		runDone = done
 		mu.Unlock()
-		setConnected(true, "Подключение…")
+		setConnected(true, "Connecting…")
 		go func() {
 			defer close(done)
 			err := client.Run(ctx, client.Options{Proxy: proxyURL, DNS: "8.8.8.8", Log: logger})
@@ -112,27 +112,27 @@ func main() {
 			runDone = nil
 			mu.Unlock()
 			if err != nil {
-				logger.Printf("Ошибка: %v", err)
-				setConnected(false, "Ошибка подключения")
+				logger.Printf("Error: %v", err)
+				setConnected(false, "Connection failed")
 				return
 			}
-			setConnected(false, "Отключено")
+			setConnected(false, "Disconnected")
 		}()
 	})
 	connectButton.Importance = widget.HighImportance
 
 	form := widget.NewForm(
-		widget.NewFormItem("Протокол", protocol),
-		widget.NewFormItem("Сервер", host),
-		widget.NewFormItem("Порт", port),
-		widget.NewFormItem("Пользователь", username),
-		widget.NewFormItem("Пароль", password),
+		widget.NewFormItem("Protocol", protocol),
+		widget.NewFormItem("Server", host),
+		widget.NewFormItem("Port", port),
+		widget.NewFormItem("Username", username),
+		widget.NewFormItem("Password", password),
 	)
 	buttons := container.New(layout.NewGridLayout(2), connectButton, disconnectButton)
-	help := widget.NewLabel("Для изменения системных маршрутов приложение нужно запустить с правами администратора/root.")
+	help := widget.NewLabel("Run the application with administrator/root privileges to change system routes.")
 	help.Wrapping = fyne.TextWrapWord
 	w.SetContent(container.NewBorder(
-		container.NewVBox(widget.NewLabelWithStyle("SOCKS4/SOCKS5 → системный VPN", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}), form, buttons, status, help),
+		container.NewVBox(widget.NewLabelWithStyle("SOCKS4/SOCKS5 → system VPN", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}), form, buttons, status, help),
 		nil, nil, nil,
 		container.NewScroll(logs),
 	))
@@ -147,7 +147,7 @@ func main() {
 			return
 		}
 		stop()
-		setConnected(true, "Отключение…")
+		setConnected(true, "Disconnecting…")
 		go func() {
 			if done != nil {
 				<-done
@@ -166,12 +166,12 @@ func showPrivilegeAlert(a fyne.App, w fyne.Window, goos string) {
 	label := widget.NewLabel(message)
 	label.Wrapping = fyne.TextWrapWord
 	w.Resize(fyne.NewSize(480, 180))
-	w.SetTitle("Требуются права администратора")
-	w.SetContent(container.NewCenter(widget.NewLabel("Запуск остановлен: недостаточно прав.")))
+	w.SetTitle("Administrator privileges required")
+	w.SetContent(container.NewCenter(widget.NewLabel("Startup stopped: insufficient privileges.")))
 	w.SetCloseIntercept(a.Quit)
 	w.Show()
 
-	closeButton := widget.NewButton("Закрыть", a.Quit)
+	closeButton := widget.NewButton("Close", a.Quit)
 	alert := widget.NewModalPopUp(container.NewVBox(label, closeButton), w.Canvas())
 	alert.Show()
 	a.Run()
@@ -180,25 +180,25 @@ func showPrivilegeAlert(a fyne.App, w fyne.Window, goos string) {
 func privilegeMessage(goos string) string {
 	switch goos {
 	case "windows":
-		return "GUI не запущен. Откройте go-socks2vpn через «Запуск от имени администратора»."
+		return "The GUI was not started. Open go-socks2vpn using Run as administrator."
 	case "darwin", "linux":
-		return "GUI не запущен. Запустите приложение из терминала командой: sudo -E socks2vpn-gui"
+		return "The GUI was not started. Run the application from a terminal with: sudo -E socks2vpn-gui"
 	default:
-		return "GUI не запущен. Для изменения системных маршрутов требуются права администратора."
+		return "The GUI was not started. Administrator privileges are required to change system routes."
 	}
 }
 
 func makeProxyURL(protocol, hostText, portText, username, password string) (string, error) {
 	host := strings.TrimSpace(hostText)
 	if host == "" || strings.ContainsAny(host, " /\\\t\r\n") {
-		return "", fmt.Errorf("укажите корректный адрес сервера")
+		return "", fmt.Errorf("enter a valid server address")
 	}
 	port, err := strconv.Atoi(strings.TrimSpace(portText))
 	if err != nil || port < 1 || port > 65535 {
-		return "", fmt.Errorf("порт должен быть числом от 1 до 65535")
+		return "", fmt.Errorf("port must be a number from 1 to 65535")
 	}
 	if username == "" && password != "" {
-		return "", fmt.Errorf("пароль задан без пользователя")
+		return "", fmt.Errorf("a password was provided without a username")
 	}
 	scheme := proxyconfig.SchemeSOCKS5
 	if protocol == "SOCKS4" {

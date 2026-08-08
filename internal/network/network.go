@@ -21,24 +21,24 @@ func Detect(ctx context.Context, goos string, runner command.Runner) (Info, erro
 	case "linux":
 		out, err := runner.Output(ctx, command.C("ip", "-4", "route", "show", "default"))
 		if err != nil {
-			return Info{}, fmt.Errorf("не удалось определить основной маршрут Linux: %w", err)
+			return Info{}, fmt.Errorf("could not detect the primary Linux route: %w", err)
 		}
 		return parseLinuxRoutes(string(out))
 	case "darwin":
 		out, err := runner.Output(ctx, command.C("route", "-n", "get", "default"))
 		if err != nil {
-			return Info{}, fmt.Errorf("не удалось определить основной маршрут macOS: %w", err)
+			return Info{}, fmt.Errorf("could not detect the primary macOS route: %w", err)
 		}
 		return parseDarwinRoute(string(out))
 	case "windows":
 		script := `$r=Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' | Where-Object {$_.State -eq 'Alive'} | Sort-Object RouteMetric,InterfaceMetric | Select-Object -First 1; if ($null -eq $r) { exit 2 }; $a=Get-NetAdapter -InterfaceIndex $r.InterfaceIndex; [Console]::OutputEncoding=[Text.Encoding]::UTF8; Write-Output $a.Name; Write-Output $r.NextHop`
 		out, err := runner.Output(ctx, command.C("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script))
 		if err != nil {
-			return Info{}, fmt.Errorf("не удалось определить основной маршрут Windows: %w", err)
+			return Info{}, fmt.Errorf("could not detect the primary Windows route: %w", err)
 		}
 		return parseWindowsRoute(string(out))
 	default:
-		return Info{}, fmt.Errorf("определение сети не поддерживается для %s", goos)
+		return Info{}, fmt.Errorf("network detection is not supported on %s", goos)
 	}
 }
 
@@ -62,7 +62,7 @@ func parseLinuxRoutes(output string) (Info, error) {
 		}
 	}
 	if best.Interface == "" {
-		return Info{}, errors.New("маршрут по умолчанию с сетевым интерфейсом не найден")
+		return Info{}, errors.New("default route with a network interface was not found")
 	}
 	best.DefaultRoutes = routes
 	return best, nil
@@ -83,7 +83,7 @@ func parseDarwinRoute(output string) (Info, error) {
 		}
 	}
 	if info.Interface == "" {
-		return Info{}, errors.New("интерфейс основного маршрута macOS не найден")
+		return Info{}, errors.New("primary macOS route interface was not found")
 	}
 	return info, nil
 }
@@ -91,7 +91,7 @@ func parseDarwinRoute(output string) (Info, error) {
 func parseWindowsRoute(output string) (Info, error) {
 	lines := strings.Split(strings.ReplaceAll(strings.TrimSpace(output), "\r", ""), "\n")
 	if len(lines) < 2 || strings.TrimSpace(lines[0]) == "" {
-		return Info{}, errors.New("PowerShell не вернул интерфейс и шлюз")
+		return Info{}, errors.New("PowerShell did not return an interface and gateway")
 	}
 	return Info{Interface: strings.TrimSpace(lines[0]), Gateway: strings.TrimSpace(lines[1])}, nil
 }

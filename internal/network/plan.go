@@ -36,13 +36,13 @@ func BuildPlan(ctx context.Context, goos string, info Info, dns string, runner c
 	case "windows":
 		return windowsPlan(dns), nil
 	default:
-		return Plan{}, fmt.Errorf("настройка VPN не поддерживается для %s", goos)
+		return Plan{}, fmt.Errorf("VPN configuration is not supported on %s", goos)
 	}
 }
 
 func linuxPlan(ctx context.Context, info Info, runner command.Runner) (Plan, error) {
 	if info.Interface == "" {
-		return Plan{}, fmt.Errorf("не указан основной сетевой интерфейс")
+		return Plan{}, fmt.Errorf("primary network interface is not specified")
 	}
 	allRP, err := sysctlValue(ctx, runner, "net.ipv4.conf.all.rp_filter")
 	if err != nil {
@@ -131,11 +131,11 @@ func windowsPlan(dns string) Plan {
 func sysctlValue(ctx context.Context, runner command.Runner, key string) (string, error) {
 	out, err := runner.Output(ctx, command.C("sysctl", "-n", key))
 	if err != nil {
-		return "", fmt.Errorf("не удалось прочитать %s: %w", key, err)
+		return "", fmt.Errorf("could not read %s: %w", key, err)
 	}
 	value := strings.TrimSpace(string(out))
 	if value == "" {
-		return "", fmt.Errorf("sysctl %s вернул пустое значение", key)
+		return "", fmt.Errorf("sysctl %s returned an empty value", key)
 	}
 	return value, nil
 }

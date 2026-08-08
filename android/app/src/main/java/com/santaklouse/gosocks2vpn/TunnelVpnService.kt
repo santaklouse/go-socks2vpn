@@ -27,17 +27,17 @@ class TunnelVpnService : VpnService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                showForegroundNotification("Подключение…")
+                showForegroundNotification("Connecting…")
                 val request = StartRequest.from(intent)
                 executor.execute { startTunnel(request) }
             }
-            ACTION_STOP -> executor.execute { stopTunnel("Отключено") }
+            ACTION_STOP -> executor.execute { stopTunnel("Disconnected") }
         }
         return Service.START_NOT_STICKY
     }
 
     override fun onRevoke() {
-        executor.execute { stopTunnel("Разрешение VPN отозвано") }
+        executor.execute { stopTunnel("VPN permission was revoked") }
         super.onRevoke()
     }
 
@@ -67,17 +67,17 @@ class TunnelVpnService : VpnService() {
                 .addDnsServer("1.1.1.1")
                 .addDisallowedApplication(packageName)
                 .setBlocking(false)
-                .establish() ?: error("Android не создал VPN-интерфейс")
+                .establish() ?: error("Android did not create the VPN interface")
 
             // Ownership is transferred to the Go engine. Engine.Stop closes this fd.
 			val detachedFd = descriptor.detachFd()
             Mobile.start(detachedFd.toLong(), proxyUrl, MTU.toLong())
             running.set(true)
-            showForegroundNotification("Подключено к ${request.host}:${request.port}")
-            broadcastStatus(true, "Подключено")
+            showForegroundNotification("Connected to ${request.host}:${request.port}")
+            broadcastStatus(true, "Connected")
         } catch (error: Throwable) {
             running.set(false)
-            broadcastStatus(false, "Ошибка: ${error.message ?: error.javaClass.simpleName}")
+            broadcastStatus(false, "Error: ${error.message ?: error.javaClass.simpleName}")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }

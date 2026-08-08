@@ -1,56 +1,58 @@
 # go-socks2vpn
 
+English | [Russian](README.RU.md)
+
 [![CI](https://github.com/santaklouse/go-socks2vpn/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/santaklouse/go-socks2vpn/actions/workflows/build.yml)
 [![Latest tag](https://img.shields.io/github/v/tag/santaklouse/go-socks2vpn)](https://github.com/santaklouse/go-socks2vpn/tags)
 [![Go version](https://img.shields.io/github/go-mod/go-version/santaklouse/go-socks2vpn)](https://github.com/santaklouse/go-socks2vpn/blob/main/go.mod)
 
-Кроссплатформенное приложение на Go, которое превращает удалённый SOCKS4- или SOCKS5-прокси в системный VPN на macOS, Linux, Windows, Android и внутри Linux-контейнера.
+A cross-platform Go application that turns a remote SOCKS4 or SOCKS5 proxy into a system VPN on macOS, Linux, Windows, Android, and inside a Linux container.
 
-В проект входят:
+The project includes:
 
-- `cmd/socks2vpn` — CLI для macOS, Linux и Windows;
-- `desktop-gui` — минимальный Fyne GUI для macOS, Linux и Windows;
-- `android` — Android-приложение на `VpnService` без root;
-- `Dockerfile` и `compose.yaml` — multi-arch контейнер и sidecar-сценарий;
-- официальный `xjasonlyu/tun2socks/v2` встроен как обычная Go-зависимость;
-- SHA-256 проверка Windows-драйвера Wintun и полный откат сетевых изменений.
+- `cmd/socks2vpn` — a CLI for macOS, Linux, and Windows;
+- `desktop-gui` — a minimal Fyne GUI for macOS, Linux, and Windows;
+- `android` — a rootless Android application based on `VpnService`;
+- `Dockerfile` and `compose.yaml` — a multi-architecture container and sidecar setup;
+- the official `xjasonlyu/tun2socks/v2` package embedded as a regular Go dependency;
+- SHA-256 verification of the Windows Wintun driver and complete rollback of network changes.
 
-## Установка CLI
+## CLI installation
 
-Требуется Go 1.26.3 или новее — это минимальная версия текущего `tun2socks` v2.7.0.
+Go 1.26.3 or newer is required. This is the minimum version supported by the current `tun2socks` v2.7.0 dependency.
 
-Установить последнюю опубликованную версию:
+Install the latest published version:
 
 ```bash
 go install github.com/santaklouse/go-socks2vpn/cmd/socks2vpn@latest
 ```
 
-Go устанавливает бинарник в каталог, который возвращает `go env GOBIN`, либо в `$(go env GOPATH)/bin`, если `GOBIN` не задан. Пример запуска на macOS и Linux:
+Go installs the binary into the directory returned by `go env GOBIN`, or into `$(go env GOPATH)/bin` when `GOBIN` is not set. Example for macOS and Linux:
 
 ```bash
 sudo "$(go env GOPATH)/bin/socks2vpn" --proxy 'socks4://192.168.192.100:9050'
 ```
 
-В Windows откройте PowerShell от имени администратора:
+On Windows, open PowerShell as Administrator:
 
 ```powershell
 & "$(go env GOPATH)\bin\socks2vpn.exe" --proxy "socks4://192.168.192.100:9050"
 ```
 
-Собрать CLI из локальной копии исходного кода:
+Build the CLI from a local source checkout:
 
 ```bash
 go build -o bin/socks2vpn ./cmd/socks2vpn
 sudo ./bin/socks2vpn --proxy '192.0.2.10:1080:alice:correct-horse-battery-staple'
 ```
 
-В Windows откройте PowerShell от имени администратора:
+On Windows, open PowerShell as Administrator:
 
 ```powershell
 .\socks2vpn.exe --proxy "192.0.2.10:1080:alice:correct-horse-battery-staple"
 ```
 
-Без `--proxy` программа запросит эту строку интерактивно. Поддерживаются также URL и IPv6:
+Without `--proxy`, the program prompts for the proxy string interactively. URLs and IPv6 are also supported:
 
 ```bash
 sudo ./bin/socks2vpn --proxy 'socks5://alice:correct-horse-battery-staple@192.0.2.10:1080'
@@ -58,108 +60,108 @@ sudo ./bin/socks2vpn --proxy '[2001:db8::10]:1080:alice:correct-horse-battery-st
 sudo ./bin/socks2vpn --proxy 'socks4://192.168.192.100:9050'
 ```
 
-Проверить план без загрузки и изменения сети:
+Preview the plan without downloading files or changing the network:
 
 ```bash
 ./bin/socks2vpn --dry-run --proxy '192.0.2.10:1080'
 ```
 
-Проверить SOCKS handshake без root и без создания VPN:
+Test the SOCKS handshake without root privileges or VPN creation:
 
 ```bash
 ./bin/socks2vpn --proxy 'socks4://192.168.192.100:9050' --check-proxy --check-target '1.1.1.1:443'
 ```
 
-Отдельный бинарник `tun2socks` не загружается и не запускается: сетевой стек компилируется прямо в `socks2vpn`. На Windows при первом запуске автоматически загружается только официальный нативный компонент Wintun 0.14.1; закреплённые SHA-256 проверяют и архив, и DLL нужной архитектуры, включая последующие запуски из кэша. На macOS и Linux во время работы ничего не скачивается.
+No separate `tun2socks` executable is downloaded or launched: the network stack is compiled directly into `socks2vpn`. On Windows, only the official native Wintun 0.14.1 component is downloaded on first launch. Pinned SHA-256 hashes verify both the archive and the architecture-specific DLL, including subsequent launches from the cache. Nothing is downloaded at runtime on macOS or Linux.
 
 ## Desktop GUI
 
-Установка последнего релиза одной командой на macOS и Linux:
+Install the latest release with one command on macOS or Linux:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/santaklouse/go-socks2vpn/main/scripts/install-gui.sh | sh
 ```
 
-Установщик определяет ОС и архитектуру, скачивает подходящий GUI-архив, проверяет его по `SHA256SUMS` и устанавливает бинарник в `/usr/local/bin`. В Linux он также устанавливает недостающие OpenGL, Wayland, XKB и X11 runtime-библиотеки через `apt`, `dnf`, `yum` или `pacman`.
+The installer detects the operating system and architecture, downloads the matching GUI archive, verifies it against `SHA256SUMS`, and installs the binary into `/usr/local/bin`. On Linux, it also installs missing OpenGL, Wayland, XKB, and X11 runtime libraries through `apt`, `dnf`, `yum`, or `pacman`.
 
-После установки запустите GUI с правами администратора:
+After installation, run the GUI with administrator privileges:
 
 ```bash
 sudo -E socks2vpn-gui
 ```
 
-Установка в Windows из PowerShell:
+Install on Windows from PowerShell:
 
 ```powershell
 irm https://raw.githubusercontent.com/santaklouse/go-socks2vpn/main/scripts/install-gui.ps1 | iex
 ```
 
-Windows-установщик проверяет SHA-256, устанавливает программу в `%LOCALAPPDATA%\Programs\go-socks2vpn`, добавляет её в пользовательский `PATH` и создаёт ярлык `go-socks2vpn` в меню «Пуск». Ярлык автоматически показывает стандартный UAC-запрос. Windows ARM64 использует amd64-сборку через системную x64-эмуляцию.
+The Windows installer verifies SHA-256, installs the program into `%LOCALAPPDATA%\Programs\go-socks2vpn`, adds it to the user `PATH`, and creates a `go-socks2vpn` Start menu shortcut. The shortcut automatically shows the standard UAC prompt. Windows ARM64 runs the amd64 build through the operating system's x64 emulation.
 
-Поддерживаются готовые GUI-релизы для macOS amd64/arm64, Linux amd64 и Windows amd64. Для установки конкретной версии на macOS или Linux задайте, например, `GO_SOCKS2VPN_VERSION=v1.0.0`; в Windows скачайте скрипт и запустите его с параметром `-Version v1.0.0`.
+Prebuilt GUI releases are available for macOS amd64/arm64, Linux amd64, and Windows amd64. To install a specific version on macOS or Linux, set, for example, `GO_SOCKS2VPN_VERSION=v1.0.0`. On Windows, download the script and run it with `-Version v1.0.0`.
 
-Ручная сборка из исходного кода:
+Build manually from source:
 
 ```bash
 make gui
 sudo ./bin/socks2vpn-gui
 ```
 
-На Windows запускайте `socks2vpn-gui.exe` через «Запуск от имени администратора». На Linux можно использовать `sudo -E`; на macOS — `sudo` из Terminal. GUI проверяет права до инициализации VPN: без root/Administrator основное окно не открывается, показывается модальный alert с правильной командой запуска, после его закрытия приложение завершается. GUI сохраняет сервер, порт и имя пользователя, но никогда не сохраняет пароль.
+On Windows, launch `socks2vpn-gui.exe` with **Run as administrator**. On Linux, use `sudo -E`; on macOS, use `sudo` from Terminal. The GUI checks privileges before initializing the VPN. Without root or Administrator privileges, the main window does not open; instead, the application displays a modal alert with the correct launch command and exits when the alert is closed. The GUI saves the server, port, and username, but never the password.
 
 ## Android
 
-Android использует системный `VpnService`, поэтому root не нужен. Первый запуск показывает стандартный Android-диалог разрешения VPN. Собственный UID приложения исключён из TUN-маршрута, чтобы соединение Go-движка с SOCKS-сервером не попало обратно в VPN.
+Android uses the system `VpnService`, so root access is not required. The first launch shows the standard Android VPN permission dialog. The application's own UID is excluded from the TUN route so that the Go engine's connection to the SOCKS server does not loop back into the VPN.
 
-Требования для локальной сборки:
+Local build requirements:
 
 - JDK 17;
-- Android SDK Platform 36 и Build Tools 36.0.0;
+- Android SDK Platform 36 and Build Tools 36.0.0;
 - Android NDK `28.2.13676358`;
-- Go 1.26.3 для upstream tun2socks `v2.7.0`.
+- Go 1.26.3 for upstream tun2socks `v2.7.0`.
 
 ```bash
 cd android
 ./gradlew assembleDebug
 ```
 
-Скрипт Gradle сам собирает общий Go-движок в `app/libs/tun2socks.aar` через `gomobile`; это библиотека внутри APK, не отдельный процесс. Готовый APK находится в `android/app/build/outputs/apk/debug/app-debug.apk`.
+The Gradle script builds the shared Go engine into `app/libs/tun2socks.aar` through `gomobile`; this is a library inside the APK, not a separate process. The resulting APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-Android-приложение поддерживает IPv4 и IPv6, задаёт DNS `1.1.1.1`, выполняет TCP preflight прокси и работает как foreground VPN service. Пароль живёт только в памяти процесса до отключения.
+The Android application supports IPv4 and IPv6, configures DNS `1.1.1.1`, performs a TCP proxy preflight, and runs as a foreground VPN service. The password remains in process memory only until disconnection.
 
 ## Docker
 
-Образ собирается для `linux/amd64` и `linux/arm64`. Внутри контейнера нужны capability `NET_ADMIN` и устройство `/dev/net/tun`; готовый `compose.yaml` уже задаёт их. По умолчанию используется предоставленный SOCKS4-сервер `192.168.192.100:9050`.
+The image is built for `linux/amd64` and `linux/arm64`. The container requires the `NET_ADMIN` capability and the `/dev/net/tun` device; the provided `compose.yaml` already configures both. The supplied SOCKS4 server `192.168.192.100:9050` is used by default.
 
-Проверить SOCKS4 handshake тем же кодом, который использует TUN-движок, без изменения маршрутов:
+Test the SOCKS4 handshake with the same code used by the TUN engine, without changing routes:
 
 ```bash
 make docker-check
 ```
 
-Запустить VPN внутри отдельного container network namespace:
+Start the VPN inside a separate container network namespace:
 
 ```bash
 make docker-up
 ```
 
-Проверить TCP-трафик через созданный `tun0`:
+Test TCP traffic through the created `tun0` interface:
 
 ```bash
 make docker-traffic-check
 ```
 
-Другие контейнеры можно подключать как sidecar через `network_mode: service:socks2vpn`. Маршруты меняются только внутри этого network namespace: Docker-контейнер не превращает сетевой стек хоста macOS или Windows в VPN — для этого используйте нативный GUI.
+Other containers can use it as a sidecar with `network_mode: service:socks2vpn`. Routes are changed only inside that network namespace: a Docker container does not turn the macOS or Windows host network stack into a VPN. Use the native GUI for host-wide routing.
 
-Сервер `192.168.192.100:9050` проверен с SOCKS4A и SOCKS5. Чтобы получить UDP и DNS через прокси, переключите Compose на SOCKS5:
+The server at `192.168.192.100:9050` has been tested with SOCKS4A and SOCKS5. Switch Compose to SOCKS5 to proxy UDP and DNS:
 
 ```bash
 SOCKS_PROXY=socks5://192.168.192.100:9050 docker compose up --build socks2vpn
 ```
 
-SOCKS4 не имеет UDP relay и не поддерживает IPv6 назначения. В режиме `socks4://` TCP к IPv4 работает, но UDP-приложения, IPv6-соединения и DNS-запросы, попавшие в TUN, не смогут пройти через прокси.
+SOCKS4 has no UDP relay and does not support IPv6 destinations. In `socks4://` mode, TCP to IPv4 works, but UDP applications, IPv6 connections, and DNS requests entering the TUN interface cannot pass through the proxy.
 
-## Проверки и сборка
+## Testing and builds
 
 ```bash
 make test
@@ -167,41 +169,41 @@ make test
 ./scripts/build-gui.sh
 ```
 
-`scripts/build-all.sh` создаёт CLI для macOS amd64/arm64, Linux 386/amd64/arm/arm64/riscv64 и Windows 386/amd64/arm64. GUI собирается нативно на каждой desktop-системе. GitHub Actions отдельно проверяет unit tests, все CLI targets, четыре GUI runner и Android APK.
+`scripts/build-all.sh` creates CLI binaries for macOS amd64/arm64, Linux 386/amd64/arm/arm64/riscv64, and Windows 386/amd64/arm64. The GUI is built natively on each desktop system. GitHub Actions separately verifies unit tests, all CLI targets, four GUI runners, and the Android APK.
 
-## GitHub Actions и релизы
+## GitHub Actions and releases
 
-Workflow `.github/workflows/build.yml` запускает unit tests, race detector, `go vet`, все CLI-сборки, четыре нативные GUI-сборки, Android APK и multi-arch Docker build при каждом push и pull request. macOS GUI собирается отдельно для Apple Silicon и Intel.
+The `.github/workflows/build.yml` workflow runs unit tests, the race detector, `go vet`, every CLI build, four native GUI builds, an Android APK build, and a multi-architecture Docker build on every push and pull request. The macOS GUI is built separately for Apple Silicon and Intel.
 
-Push семантического тега автоматически создаёт GitHub Release с архивами программ, подписанным Android APK, автоматически сгенерированным описанием и файлом `SHA256SUMS`:
+Pushing a semantic version tag automatically creates a GitHub Release containing application archives, a signed Android APK, automatically generated release notes, and `SHA256SUMS`:
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-Теги вида `v1.0.0-rc.1` публикуются как prerelease. Release создаётся только после успешного завершения всех тестов и всех платформенных сборок. Дополнительные токены или сторонние release actions не нужны: публикация выполняется официальным `GITHUB_TOKEN` через установленный на runner GitHub CLI.
+Tags such as `v1.0.0-rc.1` are published as prereleases. A release is created only after all tests and platform builds succeed. No additional token or third-party release action is required: publishing uses the official `GITHUB_TOKEN` through the GitHub CLI installed on the runner.
 
-Тот же тег публикует образы `linux/amd64` и `linux/arm64` в GitHub Container Registry:
+The same tag publishes `linux/amd64` and `linux/arm64` images to GitHub Container Registry:
 
 ```bash
 docker pull ghcr.io/santaklouse/go-socks2vpn:v1.0.0
 ```
 
-Для подписанного Android APK один раз добавьте в настройках репозитория четыре GitHub Actions secret:
+For a signed Android APK, add four GitHub Actions secrets in the repository settings once:
 
-- `ANDROID_KEYSTORE_BASE64` — release-keystore целиком в Base64;
-- `ANDROID_KEYSTORE_PASSWORD` — пароль keystore;
-- `ANDROID_KEY_ALIAS` — alias ключа;
-- `ANDROID_KEY_PASSWORD` — пароль ключа.
+- `ANDROID_KEYSTORE_BASE64` — the entire release keystore encoded as Base64;
+- `ANDROID_KEYSTORE_PASSWORD` — the keystore password;
+- `ANDROID_KEY_ALIAS` — the key alias;
+- `ANDROID_KEY_PASSWORD` — the key password.
 
-Создать release-keystore можно интерактивно — пароли не попадут в историю shell:
+Create a release keystore interactively so that passwords do not enter shell history:
 
 ```bash
 keytool -genkeypair -v -keystore go-socks2vpn-release.jks -alias go-socks2vpn -keyalg RSA -keysize 3072 -validity 10000
 ```
 
-Получить значение `ANDROID_KEYSTORE_BASE64`:
+Generate the `ANDROID_KEYSTORE_BASE64` value:
 
 ```bash
 # macOS
@@ -211,12 +213,12 @@ base64 -i go-socks2vpn-release.jks | tr -d '\n'
 base64 -w 0 go-socks2vpn-release.jks
 ```
 
-Сам файл `go-socks2vpn-release.jks` и его пароли храните отдельно от репозитория: потеря ключа лишит будущие APK возможности обновлять уже установленное приложение.
+Store `go-socks2vpn-release.jks` and its passwords separately from the repository. Losing the key prevents future APKs from updating an already installed application.
 
-При push/PR workflow собирает устанавливаемый debug APK. Для тега он требует эти четыре секрета, подставляет версию из тега, использует монотонный номер workflow как Android `versionCode` и публикует подписанный `go-socks2vpn-android.apk`. Без ключа теговый pipeline завершится ошибкой до создания неполного GitHub Release.
+For pushes and pull requests, the workflow builds an installable debug APK. For a tag, it requires all four secrets, derives the version from the tag, uses the monotonically increasing workflow run number as the Android `versionCode`, and publishes a signed `go-socks2vpn-android.apk`. Without the key, the tagged pipeline fails before it can create an incomplete GitHub Release.
 
-## Важные ограничения
+## Important limitations
 
-- Нужен SOCKS-сервер с поддержкой нужных приложению протоколов. SOCKS4 передаёт только TCP; для UDP и DNS через прокси используйте SOCKS5 с UDP ASSOCIATE.
-- Desktop-маршруты меняются глобально и требуют повышенных прав. Процесс нельзя принудительно убивать через `kill -9`, иначе он не успеет выполнить откат. После обычного Ctrl+C откат автоматический.
-- На всех платформах используется один встроенный Go-движок из пакета `engine`. Android передаёт ему файловый дескриптор от `VpnService` через тонкую `gomobile`-обёртку.
+- The SOCKS server must support the protocols required by the application. SOCKS4 carries TCP only; use SOCKS5 with UDP ASSOCIATE for UDP and DNS through the proxy.
+- Desktop routes are changed globally and require elevated privileges. Do not forcibly terminate the process with `kill -9`, because it will not have a chance to roll back the changes. Rollback is automatic after a regular Ctrl+C.
+- Every platform uses the same embedded Go engine from the `engine` package. Android passes the file descriptor from `VpnService` through a thin `gomobile` wrapper.

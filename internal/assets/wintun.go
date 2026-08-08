@@ -51,7 +51,7 @@ func New(log Logger) *Downloader {
 func DefaultCacheDir() (string, error) {
 	dir, err := os.UserCacheDir()
 	if err != nil {
-		return "", fmt.Errorf("не удалось определить каталог кэша: %w", err)
+		return "", fmt.Errorf("could not determine the cache directory: %w", err)
 	}
 	return filepath.Join(dir, "go-socks2vpn"), nil
 }
@@ -64,39 +64,39 @@ func (d *Downloader) EnsureWintun(ctx context.Context, info platform.Info, dir s
 	}
 	arch := map[string]string{"386": "x86", "amd64": "amd64", "arm": "arm", "arm64": "arm64"}[info.Arch]
 	if arch == "" {
-		return "", fmt.Errorf("Wintun не поддерживает архитектуру %s", info.Arch)
+		return "", fmt.Errorf("Wintun does not support the %s architecture", info.Arch)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("не удалось создать каталог %s: %w", dir, err)
+		return "", fmt.Errorf("could not create directory %s: %w", dir, err)
 	}
 	destination := filepath.Join(dir, "wintun.dll")
 	if regularFile(destination) {
 		existing, err := os.ReadFile(destination)
 		if err == nil && verifySHA256(existing, wintunDLLSHA256[arch]) == nil {
-			d.printf("Используется проверенный Wintun: %s", destination)
+			d.printf("Using verified Wintun: %s", destination)
 			return destination, nil
 		}
-		d.printf("Кэшированный Wintun повреждён или изменён; файл будет заменён")
+		d.printf("Cached Wintun is corrupted or modified; the file will be replaced")
 	}
-	d.printf("Загрузка нативного драйвера Wintun 0.14.1")
+	d.printf("Downloading the native Wintun 0.14.1 driver")
 	archive, err := d.download(ctx, d.WintunURL)
 	if err != nil {
-		return "", fmt.Errorf("не удалось загрузить Wintun: %w", err)
+		return "", fmt.Errorf("could not download Wintun: %w", err)
 	}
 	if err := verifySHA256(archive, wintunSHA256); err != nil {
-		return "", fmt.Errorf("проверка Wintun не пройдена: %w", err)
+		return "", fmt.Errorf("Wintun verification failed: %w", err)
 	}
 	dll, err := extractExact(archive, "wintun/bin/"+arch+"/wintun.dll")
 	if err != nil {
 		return "", err
 	}
 	if err := verifySHA256(dll, wintunDLLSHA256[arch]); err != nil {
-		return "", fmt.Errorf("проверка Wintun DLL не пройдена: %w", err)
+		return "", fmt.Errorf("Wintun DLL verification failed: %w", err)
 	}
 	if err := atomicWrite(destination, dll, 0o644); err != nil {
 		return "", err
 	}
-	d.printf("Wintun установлен: %s", destination)
+	d.printf("Wintun installed: %s", destination)
 	return destination, nil
 }
 
@@ -119,7 +119,7 @@ func (d *Downloader) download(ctx context.Context, rawURL string) ([]byte, error
 		return nil, err
 	}
 	if len(data) > maxDownloadSize {
-		return nil, fmt.Errorf("файл превышает допустимый размер %d MiB", maxDownloadSize>>20)
+		return nil, fmt.Errorf("file exceeds the maximum size of %d MiB", maxDownloadSize>>20)
 	}
 	return data, nil
 }
@@ -127,11 +127,11 @@ func (d *Downloader) download(ctx context.Context, rawURL string) ([]byte, error
 func verifySHA256(data []byte, expected string) error {
 	want, err := hex.DecodeString(expected)
 	if err != nil || len(want) != sha256.Size {
-		return errors.New("некорректный ожидаемый SHA-256")
+		return errors.New("invalid expected SHA-256")
 	}
 	got := sha256.Sum256(data)
 	if !bytes.Equal(got[:], want) {
-		return fmt.Errorf("SHA-256 не совпадает: получено %x, ожидалось %s", got, expected)
+		return fmt.Errorf("SHA-256 mismatch: got %x, expected %s", got, expected)
 	}
 	return nil
 }
@@ -139,14 +139,14 @@ func verifySHA256(data []byte, expected string) error {
 func extractExact(data []byte, name string) ([]byte, error) {
 	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		return nil, fmt.Errorf("некорректный ZIP-архив: %w", err)
+		return nil, fmt.Errorf("invalid ZIP archive: %w", err)
 	}
 	for _, file := range r.File {
 		if filepath.ToSlash(file.Name) != name {
 			continue
 		}
 		if file.UncompressedSize64 > maxDownloadSize {
-			return nil, errors.New("распакованный Wintun DLL слишком велик")
+			return nil, errors.New("extracted Wintun DLL is too large")
 		}
 		reader, err := file.Open()
 		if err != nil {
@@ -162,13 +162,13 @@ func extractExact(data []byte, name string) ([]byte, error) {
 		}
 		return content, nil
 	}
-	return nil, fmt.Errorf("файл %s отсутствует в архиве Wintun", name)
+	return nil, fmt.Errorf("file %s is missing from the Wintun archive", name)
 }
 
 func atomicWrite(path string, data []byte, mode os.FileMode) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".wintun-*")
 	if err != nil {
-		return fmt.Errorf("не удалось создать временный файл: %w", err)
+		return fmt.Errorf("could not create a temporary file: %w", err)
 	}
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName)
@@ -188,7 +188,7 @@ func atomicWrite(path string, data []byte, mode os.FileMode) error {
 		return err
 	}
 	if err := os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("не удалось установить %s: %w", path, err)
+		return fmt.Errorf("could not install %s: %w", path, err)
 	}
 	return nil
 }
