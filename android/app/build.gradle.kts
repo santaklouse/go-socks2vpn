@@ -4,8 +4,8 @@ plugins {
     id("com.android.application")
 }
 
-val releaseVersionName = providers.gradleProperty("releaseVersionName").orElse("1.0.5-dev")
-val releaseVersionCode = providers.gradleProperty("releaseVersionCode").map(String::toInt).orElse(13)
+val releaseVersionName = providers.gradleProperty("releaseVersionName").orElse("1.0.6-dev")
+val releaseVersionCode = providers.gradleProperty("releaseVersionCode").map(String::toInt).orElse(14)
 val releaseKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_FILE").orNull
 
 val buildTun2SocksAar by tasks.registering(Exec::class) {

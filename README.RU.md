@@ -173,6 +173,14 @@ Android-приложение создаёт IPv4-only VPN и работает к
 
 Образ собирается для `linux/amd64` и `linux/arm64`. Внутри контейнера нужны capability `NET_ADMIN` и устройство `/dev/net/tun`; готовый `compose.yaml` уже задаёт их. По умолчанию используется предоставленный SOCKS4-сервер `192.168.192.100:9050`.
 
+Запустить опубликованный образ напрямую (для остановки нажмите `Ctrl+C`):
+
+```bash
+docker run --rm --init --name socks2vpn --cap-add=NET_ADMIN --device=/dev/net/tun:/dev/net/tun ghcr.io/santaklouse/go-socks2vpn:latest --proxy='socks4://192.168.192.100:9050' --interface=eth0
+```
+
+Эта команда меняет маршруты только внутри контейнера. Чтобы направить через VPN трафик другого контейнера, подключите его через `--network=container:socks2vpn` либо используйте описанную ниже sidecar-конфигурацию Compose.
+
 Проверить SOCKS4 handshake тем же кодом, который использует TUN-движок, без изменения маршрутов:
 
 ```bash
