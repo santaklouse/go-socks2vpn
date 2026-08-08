@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,12 +16,17 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/santaklouse/go-socks2vpn/client"
+	"github.com/santaklouse/go-socks2vpn/internal/elevated"
 	proxyconfig "github.com/santaklouse/go-socks2vpn/internal/proxy"
 )
 
 func main() {
 	a := app.NewWithID("com.santaklouse.gosocks2vpn")
 	w := a.NewWindow("go-socks2vpn")
+	if !elevated.IsAdministrator() {
+		showPrivilegeAlert(a, w, runtime.GOOS)
+		return
+	}
 	w.Resize(fyne.NewSize(520, 520))
 
 	prefs := a.Preferences()
@@ -153,6 +159,33 @@ func main() {
 		}()
 	})
 	w.ShowAndRun()
+}
+
+func showPrivilegeAlert(a fyne.App, w fyne.Window, goos string) {
+	message := privilegeMessage(goos)
+	label := widget.NewLabel(message)
+	label.Wrapping = fyne.TextWrapWord
+	w.Resize(fyne.NewSize(480, 180))
+	w.SetTitle("Требуются права администратора")
+	w.SetContent(container.NewCenter(widget.NewLabel("Запуск остановлен: недостаточно прав.")))
+	w.SetCloseIntercept(a.Quit)
+	w.Show()
+
+	closeButton := widget.NewButton("Закрыть", a.Quit)
+	alert := widget.NewModalPopUp(container.NewVBox(label, closeButton), w.Canvas())
+	alert.Show()
+	a.Run()
+}
+
+func privilegeMessage(goos string) string {
+	switch goos {
+	case "windows":
+		return "GUI не запущен. Откройте go-socks2vpn через «Запуск от имени администратора»."
+	case "darwin", "linux":
+		return "GUI не запущен. Запустите приложение из терминала командой: sudo -E socks2vpn-gui"
+	default:
+		return "GUI не запущен. Для изменения системных маршрутов требуются права администратора."
+	}
 }
 
 func makeProxyURL(protocol, hostText, portText, username, password string) (string, error) {
