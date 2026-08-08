@@ -12,7 +12,6 @@ import android.net.VpnService
 import android.os.Build
 import android.os.SystemClock
 import mobile.Mobile
-import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -73,7 +72,7 @@ class TunnelVpnService : VpnService() {
 			broadcastStatistics(0, 0, 0, 0)
 
             val proxyUrl = request.proxyUrl()
-            preflight(request.host, request.port)
+			Mobile.checkProxy(proxyUrl)
             val descriptor = Builder()
                 .setSession("go-socks2vpn")
                 .setMtu(MTU)
@@ -116,12 +115,6 @@ class TunnelVpnService : VpnService() {
         broadcastStatus(false, message)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
-    }
-
-    private fun preflight(host: String, port: Int) {
-        java.net.Socket().use { socket ->
-            socket.connect(InetSocketAddress(host, port), 4_000)
-        }
     }
 
     private fun showForegroundNotification(message: String) {

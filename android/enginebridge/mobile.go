@@ -2,9 +2,11 @@
 package mobile
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"sync"
+	"time"
 
 	tunengine "github.com/santaklouse/go-socks2vpn/engine"
 	"golang.org/x/sys/unix"
@@ -31,11 +33,29 @@ func Start(fd int, proxyURL string, mtu int) error {
 		Device:   "fd://" + strconv.Itoa(fd),
 		ProxyURL: proxyURL,
 		MTU:      mtu,
+		DNSOverHTTPS: &tunengine.DNSOverHTTPSConfig{
+			URL:     "https://cloudflare-dns.com/dns-query",
+			Address: "1.1.1.1:443",
+		},
 	}); err != nil {
 		return err
 	}
 	current = instance
 	return nil
+}
+
+// CheckProxy performs an authenticated SOCKS handshake before Android installs
+// the full-tunnel route.
+func CheckProxy(proxyURL string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	if err := tunengine.CheckProxy(ctx, proxyURL, "1.1.1.1:443"); err != nil {
+		return err
+	}
+	return tunengine.CheckDNSOverHTTPS(ctx, proxyURL, tunengine.DNSOverHTTPSConfig{
+		URL:     "https://cloudflare-dns.com/dns-query",
+		Address: "1.1.1.1:443",
+	})
 }
 
 // Stop releases the VPN file descriptor and all network-stack resources.

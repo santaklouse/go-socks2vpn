@@ -167,7 +167,7 @@ cd android
 
 The Gradle script builds the shared Go engine into `app/libs/tun2socks.aar` through `gomobile`; this is a library inside the APK, not a separate process. The resulting APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-The Android application supports IPv4 and IPv6, configures DNS `1.1.1.1`, performs a TCP proxy preflight, and runs as a foreground VPN service. Its GUI includes the same connection lamp, session traffic totals, and live download/upload meters. The password remains in process memory only until disconnection.
+The Android application supports IPv4 and IPv6 and runs as a foreground VPN service. Before installing the full-tunnel route it performs an authenticated SOCKS handshake through the configured proxy; a reachable port with invalid credentials is therefore reported as an error instead of a successful connection. DNS packets from Android are carried as RFC 8484 DNS-over-HTTPS through the same SOCKS proxy over TCP `1.1.1.1:443`, so browsing does not depend on SOCKS5 `UDP ASSOCIATE` support and DNS also works with SOCKS4. Its GUI includes the same connection lamp, session traffic totals, and live download/upload meters. The password remains in process memory only until disconnection.
 
 ## Docker
 

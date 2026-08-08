@@ -13,6 +13,7 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 
 	"github.com/xjasonlyu/tun2socks/v2/core"
+	"github.com/xjasonlyu/tun2socks/v2/core/adapter"
 	"github.com/xjasonlyu/tun2socks/v2/core/device"
 	"github.com/xjasonlyu/tun2socks/v2/core/device/fdbased"
 	"github.com/xjasonlyu/tun2socks/v2/core/device/tun"
@@ -25,16 +26,18 @@ import (
 )
 
 type Config struct {
-	Device    string
-	Interface string
-	ProxyURL  string
-	MTU       int
+	Device       string
+	Interface    string
+	ProxyURL     string
+	MTU          int
+	DNSOverHTTPS *DNSOverHTTPSConfig
 }
 
 type Engine struct {
 	mu     sync.Mutex
 	device device.Device
 	stack  *stack.Stack
+	dns    *dnsOverHTTPSHandler
 }
 
 // Statistics contains IP traffic counters for the current engine session.
@@ -86,18 +89,33 @@ func (e *Engine) Start(config Config) (result error) {
 		dialer.RegisterSockOpt(dialer.WithBindToInterface(iface))
 	}
 	tunnel.T().SetProxy(proxy)
+	var transportHandler adapter.TransportHandler = tunnel.T()
+	var dnsHandler *dnsOverHTTPSHandler
+	if config.DNSOverHTTPS != nil {
+		dnsHandler, err = newDNSOverHTTPSHandler(transportHandler, proxy, *config.DNSOverHTTPS, nil)
+		if err != nil {
+			return err
+		}
+		transportHandler = dnsHandler
+	}
 
 	dev, err := openDevice(config.Device, uint32(config.MTU))
 	if err != nil {
+		if dnsHandler != nil {
+			dnsHandler.Close()
+		}
 		return err
 	}
 	// fdbased.Device now owns the descriptor and closes it in Device.Close.
 	ownsFD = false
 	networkStack, err := core.CreateStack(&core.Config{
 		LinkEndpoint:     dev,
-		TransportHandler: tunnel.T(),
+		TransportHandler: transportHandler,
 	})
 	if err != nil {
+		if dnsHandler != nil {
+			dnsHandler.Close()
+		}
 		dev.Close()
 		return fmt.Errorf("cannot create tun2socks network stack: %w", err)
 	}
@@ -108,6 +126,7 @@ func (e *Engine) Start(config Config) (result error) {
 	}
 	e.device = dev
 	e.stack = networkStack
+	e.dns = dnsHandler
 	return nil
 }
 
@@ -127,6 +146,10 @@ func parseDeviceFD(raw string) (int, bool, error) {
 func (e *Engine) Stop() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.dns != nil {
+		e.dns.Close()
+		e.dns = nil
+	}
 	if e.device != nil {
 		e.device.Close()
 		e.device = nil
