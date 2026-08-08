@@ -1,5 +1,9 @@
 # go-socks2vpn
 
+[![CI](https://github.com/santaklouse/go-socks2vpn/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/santaklouse/go-socks2vpn/actions/workflows/build.yml)
+[![Latest tag](https://img.shields.io/github/v/tag/santaklouse/go-socks2vpn)](https://github.com/santaklouse/go-socks2vpn/tags)
+[![Go version](https://img.shields.io/github/go-mod/go-version/santaklouse/go-socks2vpn)](https://github.com/santaklouse/go-socks2vpn/blob/main/go.mod)
+
 Кроссплатформенное приложение на Go, которое превращает удалённый SOCKS4- или SOCKS5-прокси в системный VPN на macOS, Linux, Windows, Android и внутри Linux-контейнера.
 
 В проект входят:
@@ -11,9 +15,29 @@
 - официальный `xjasonlyu/tun2socks/v2` встроен как обычная Go-зависимость;
 - SHA-256 проверка Windows-драйвера Wintun и полный откат сетевых изменений.
 
-## Быстрый запуск CLI
+## Установка CLI
 
 Требуется Go 1.26.3 или новее — это минимальная версия текущего `tun2socks` v2.7.0.
+
+Установить последнюю опубликованную версию:
+
+```bash
+go install github.com/santaklouse/go-socks2vpn/cmd/socks2vpn@latest
+```
+
+Go устанавливает бинарник в каталог, который возвращает `go env GOBIN`, либо в `$(go env GOPATH)/bin`, если `GOBIN` не задан. Пример запуска на macOS и Linux:
+
+```bash
+sudo "$(go env GOPATH)/bin/socks2vpn" --proxy 'socks4://192.168.192.100:9050'
+```
+
+В Windows откройте PowerShell от имени администратора:
+
+```powershell
+& "$(go env GOPATH)\bin\socks2vpn.exe" --proxy "socks4://192.168.192.100:9050"
+```
+
+Собрать CLI из локальной копии исходного кода:
 
 ```bash
 go build -o bin/socks2vpn ./cmd/socks2vpn
