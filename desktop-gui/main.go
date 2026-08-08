@@ -162,7 +162,7 @@ func main() {
 					setConnectionState(stateDisconnected, "Disconnected")
 					return
 				}
-				logger.Printf("Error: %v", err)
+				logger.Printf("Error: %s", redactSensitiveError(err))
 				setConnectionState(stateDisconnected, "Connection failed")
 				return
 			}
@@ -266,6 +266,42 @@ func privilegeMessage(goos string) string {
 	default:
 		return "The GUI was not started. Administrator privileges are required to change system routes."
 	}
+}
+
+func redactSensitiveError(err error) string {
+	if err == nil {
+		return ""
+	}
+	message := err.Error()
+	parts := strings.Fields(message)
+	if len(parts) == 0 {
+		return message
+	}
+
+	trimPunctuation := func(s string) (core string, suffix string) {
+		core = s
+		for len(core) > 0 {
+			last := core[len(core)-1]
+			if last == ',' || last == '.' || last == ';' || last == ':' || last == ')' || last == ']' {
+				suffix = string(last) + suffix
+				core = core[:len(core)-1]
+				continue
+			}
+			break
+		}
+		return core, suffix
+	}
+
+	for i, part := range parts {
+		core, suffix := trimPunctuation(part)
+		lower := strings.ToLower(core)
+		if strings.HasPrefix(lower, "socks4://") || strings.HasPrefix(lower, "socks5://") {
+			if parsed, parseErr := proxyconfig.Parse(core); parseErr == nil {
+				parts[i] = parsed.RedactedURL() + suffix
+			}
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 func makeProxyURL(protocol, hostText, portText, username, password string) (string, error) {
